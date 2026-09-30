@@ -43,7 +43,7 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, async () => {
-  console.log(`[server] SIEM backend listening on :${PORT}`);
+  console.log(`[server] CyberEye SIEM backend listening on :${PORT}`);
 
   const esOk = await pingElasticsearch();
   if (!esOk) {

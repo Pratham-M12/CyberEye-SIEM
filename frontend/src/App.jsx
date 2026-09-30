@@ -24,11 +24,11 @@ export default function App() {
       <div className="mx-auto flex max-w-[1700px] items-center justify-between px-8 py-5">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-panel bg-accent text-xl font-bold text-white shadow">
-            S
+            C
           </div>
           <div>
             <h1 className="text-3xl font-semibold tracking-wide text-white">
-              Security Information & Event Management
+              CyberEye SIEM
             </h1>
             <p className="mt-1 text-sm text-ink-secondary">
               Enterprise Threat Monitoring Dashboard

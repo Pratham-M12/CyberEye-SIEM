@@ -1,7 +1,7 @@
 {
   "name": "siem-frontend",
   "version": "1.0.0",
-  "description": "Custom SIEM dashboard — React 19 frontend",
+  "description": "CyberEye SIEM dashboard — React 19 frontend",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,7 +1,7 @@
 {
   "name": "siem-backend",
   "version": "1.0.0",
-  "description": "Custom SIEM backend — Express API, socket.io realtime alerts, Elasticsearch-backed detection rule engine",
+  "description": "CyberEye SIEM backend — Express API, socket.io realtime alerts, Elasticsearch-backed detection rule engine",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

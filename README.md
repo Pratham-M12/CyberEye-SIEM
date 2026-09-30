@@ -1,12 +1,12 @@
-# AnomalyX — Custom SIEM Dashboard
+# CyberEye — Custom SIEM Dashboard
 
-AnomalyX is a full-featured, lightweight Security Information and Event Management (SIEM) platform designed for real-time threat monitoring, log normalization, aggregation-based rule correlation, and automated security alert dispatching. Built without external heavyweight dependencies like Kibana, AnomalyX couples an Elasticsearch data layer and Node.js correlation engine directly to a custom, responsive React SOC dashboard powered by live WebSockets.
+CyberEye is a full-featured, lightweight Security Information and Event Management (SIEM) platform designed for real-time threat monitoring, log normalization, aggregation-based rule correlation, and automated security alert dispatching. Built without external heavyweight dependencies like Kibana, CyberEye couples an Elasticsearch data layer and Node.js correlation engine directly to a custom, responsive React SOC dashboard powered by live WebSockets.
 
 ---
 
 ## Overview
 
-Modern security monitoring requires scalable ingestion, deterministic correlation, and actionable analyst workflows. AnomalyX provides an end-to-end detection pipeline that ingests system logs, normalizes them into a canonical schema, evaluates rolling aggregation queries across defined correlation windows, maps detected threats to the MITRE ATT&CK framework, and pushes real-time alerts to a cyber defense console. It supports live log streaming via Beats (Filebeat/Winlogbeat) as well as direct multi-format manual log uploads (EVTX, Syslog, Apache/Nginx, Snort, JSON, CSV).
+Modern security monitoring requires scalable ingestion, deterministic correlation, and actionable analyst workflows. CyberEye provides an end-to-end detection pipeline that ingests system logs, normalizes them into a canonical schema, evaluates rolling aggregation queries across defined correlation windows, maps detected threats to the MITRE ATT&CK framework, and pushes real-time alerts to a cyber defense console. It supports live log streaming via Beats (Filebeat/Winlogbeat) as well as direct multi-format manual log uploads (EVTX, Syslog, Apache/Nginx, Snort, JSON, CSV).
 
 ---
 
@@ -30,7 +30,7 @@ Modern security monitoring requires scalable ingestion, deterministic correlatio
 
 ## Architecture
 
-AnomalyX separates ingestion, normalization, detection, and visualization into distinct decoupled layers:
+CyberEye separates ingestion, normalization, detection, and visualization into distinct decoupled layers:
 
 ```mermaid
 flowchart TD
@@ -88,13 +88,13 @@ The correlation engine executes five rules using native Elasticsearch aggregatio
 | **R4** | **Web attack (SQLi/XSS)** | `medium` | Apache or Nginx request `http.uri` matching known SQL injection or cross-site scripting patterns within a **1-minute** window. | **T1190** (Exploit Public-Facing Application) |
 | **R5** | **Privilege escalation** | `critical` | Windows Event ID 4672 (`privilege_assigned`) occurring within **5 minutes** after Event ID 4624 (`auth_success`) for the **same** `user.name`. | **T1078** (Valid Accounts) |
 
-*Alert Deduplication: AnomalyX suppresses duplicate open alerts for the same rule and entity within a 5-minute cooldown window, keying on `source.ip` first, then falling back to `affected_host` and `affected_user`.*
+*Alert Deduplication: CyberEye suppresses duplicate open alerts for the same rule and entity within a 5-minute cooldown window, keying on `source.ip` first, then falling back to `affected_host` and `affected_user`.*
 
 ---
 
 ## Log Ingestion
 
-AnomalyX supports two operational ingestion mechanisms:
+CyberEye supports two operational ingestion mechanisms:
 
 ### 1. Live Log Shippers (Beats)
 - **Winlogbeat**: Configured in `winlogbeat/winlogbeat.yml` to ship Windows Security channel Event IDs (`4624`, `4625`, `4672`, `4688`) directly to Elasticsearch via the `siem-windows-normalize` pipeline.
@@ -137,7 +137,7 @@ The user interface is an enterprise-styled, single-page React console:
 
 ## AI Investigation
 
-AnomalyX integrates an AI SOC Analyst assistant powered by a Groq-compatible LLM endpoint:
+CyberEye integrates an AI SOC Analyst assistant powered by a Groq-compatible LLM endpoint:
 
 - **Model**: Configured via `GROQ_MODEL` (defaults to `openai/gpt-oss-20b`).
 - **On-Demand Execution**: To conserve API quotas, investigations are triggered only when an analyst clicks **Investigate Alert** in the Alert Detail Drawer.
@@ -155,13 +155,13 @@ AnomalyX integrates an AI SOC Analyst assistant powered by a Groq-compatible LLM
 ## Threat Intelligence & Notifications
 
 ### AbuseIPDB Integration
-- When an external `source.ip` is ingested, AnomalyX can query the AbuseIPDB API v2 to retrieve an abuse confidence score.
+- When an external `source.ip` is ingested, CyberEye can query the AbuseIPDB API v2 to retrieve an abuse confidence score.
 - If the score exceeds the threshold ($\ge 50$), the document in `siem-logs` is enriched with `threat.score` and `threat.is_malicious: true`.
 - Requires a valid `ABUSEIPDB_API_KEY` in `backend/.env`. If unconfigured, the enrichment service logs a warning and gracefully skips.
 
 ### Slack Notifications
 - High-priority detections (rules with `severity: 'critical'`, such as R2 Credential Stuffing and R5 Privilege Escalation) dispatch formatted alerts to a Slack channel via an incoming webhook.
-- Includes the rule name, affected host, attacker IP, and a deep-link to the incident in the AnomalyX dashboard.
+- Includes the rule name, affected host, attacker IP, and a deep-link to the incident in the CyberEye dashboard.
 - Requires `SLACK_WEBHOOK_URL` in `backend/.env`. If unconfigured, notification dispatching is skipped without interrupting detection.
 
 ---
@@ -250,8 +250,8 @@ siem/
 
 ### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/your-username/anomalyx-siem.git
-cd anomalyx-siem
+git clone https://github.com/your-username/cybereye-siem.git
+cd cybereye-siem
 ```
 
 ---
@@ -265,7 +265,7 @@ Copy-Item backend/.env.example backend/.env
 # On Linux / macOS:
 cp backend/.env.example backend/.env
 ```
-*(Optional)* Add your third-party API keys to `backend/.env` if you want AI investigation, AbuseIPDB enrichment, or Slack notifications enabled. If left with defaults, AnomalyX operates normally while skipping those external features.
+*(Optional)* Add your third-party API keys to `backend/.env` if you want AI investigation, AbuseIPDB enrichment, or Slack notifications enabled. If left with defaults, CyberEye operates normally while skipping those external features.
 
 ---
 
@@ -336,7 +336,7 @@ Navigate to **`http://localhost:5173`** in your browser to access the live SOC d
 
 ## Testing
 
-AnomalyX includes a suite of automated unit and integration tests using Node.js built-in test runner (`node:test`):
+CyberEye includes a suite of automated unit and integration tests using Node.js built-in test runner (`node:test`):
 
 ```bash
 cd backend
@@ -392,7 +392,7 @@ All sensitive values are configured via environment files. **Never commit `.env`
 
 ## Windows & Linux Lab Deployment
 
-AnomalyX is structured to ingest telemetry from distributed endpoints and virtual machines:
+CyberEye is structured to ingest telemetry from distributed endpoints and virtual machines:
 
 ### Lab Network Architecture
 For a safe, contained attack simulation lab:
@@ -428,7 +428,7 @@ For a safe, contained attack simulation lab:
 - **Windows VM Live Ingestion**: Windows Winlogbeat integration has been verified through pipeline simulation and schema tests, but live multi-day telemetry from a physical/virtual Windows machine remains pending hardware/VM availability.
 - **Single-Node Elasticsearch**: Current architecture relies on a single-node Elasticsearch cluster without replication or index lifecycle management (ILM).
 - **Third-Party API Requirements**: AI incident investigations, AbuseIPDB scoring, and Slack alerts require valid external API credentials.
-- **Educational / Portfolio Scope**: AnomalyX is an engineering demonstration of SIEM architecture rather than a commercially certified, compliance-hardened enterprise SOC platform.
+- **Educational / Portfolio Scope**: CyberEye is an engineering demonstration of SIEM architecture rather than a commercially certified, compliance-hardened enterprise SOC platform.
 
 ---
 
