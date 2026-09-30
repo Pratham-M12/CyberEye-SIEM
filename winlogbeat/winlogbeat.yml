@@ -1,0 +1,27 @@
+# Winlogbeat config for the Custom SIEM project.
+# Ships Windows Security event log entries to Elasticsearch, filtered down
+# to the four event IDs the detection rules care about, through the
+# siem-windows-normalize ingest pipeline (registered by
+# backend/src/ingest/normalizer.js — run `npm run setup` in backend/ once).
+
+winlogbeat.event_logs:
+  - name: Security
+    ignore_older: 72h
+    event_id: 4624, 4625, 4672, 4688 # login success, login failure, privilege assigned, process create
+
+output.elasticsearch:
+  hosts: ['localhost:9200']
+  index: 'siem-logs'
+  pipeline: 'siem-windows-normalize'
+  # No auth/TLS for local dev — matches docker-compose's
+  # xpack.security.enabled=false. Enable both before any real deployment.
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: 'C:\ProgramData\winlogbeat\logs'
+  name: winlogbeat
+  keepfiles: 7

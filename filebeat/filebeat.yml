@@ -1,0 +1,65 @@
+# Filebeat config for the Custom SIEM project.
+# Ships Snort alerts, Apache/Nginx access logs, and (optionally) Linux
+# syslog/auditd to Elasticsearch. Each input is routed through the matching
+# ingest pipeline registered by backend/src/ingest/normalizer.js
+# (run `npm run setup` in backend/ once to register them).
+
+filebeat.inputs:
+  # --- Snort IDS alerts ---
+  - type: log
+    id: snort-alerts
+    enabled: true
+    paths:
+      - /var/log/snort/alert
+    fields:
+      log_source: snort
+    fields_under_root: false
+    pipeline: siem-snort-normalize
+
+  # --- Nginx access logs ---
+  - type: log
+    id: nginx-access
+    enabled: true
+    paths:
+      - /var/log/nginx/access.log
+    fields:
+      event.module: nginx
+    fields_under_root: true
+    pipeline: siem-web-normalize
+
+  # --- Apache access logs ---
+  - type: log
+    id: apache-access
+    enabled: true
+    paths:
+      - /var/log/apache2/access.log
+      - /var/log/httpd/access_log
+    fields:
+      event.module: apache
+    fields_under_root: true
+    pipeline: siem-web-normalize
+
+  # --- Linux syslog / auditd (optional) ---
+  - type: log
+    id: linux-syslog
+    enabled: true
+    paths:
+      - /var/log/syslog
+      - /var/log/auth.log
+    pipeline: siem-syslog-normalize
+
+output.elasticsearch:
+  hosts: ['localhost:9200']
+  index: 'siem-logs'
+  # No auth/TLS for local dev — matches docker-compose's
+  # xpack.security.enabled=false. Enable both before any real deployment.
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7

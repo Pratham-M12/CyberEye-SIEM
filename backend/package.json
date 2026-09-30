@@ -1,0 +1,24 @@
+{
+  "name": "siem-backend",
+  "version": "1.0.0",
+  "description": "Custom SIEM backend — Express API, socket.io realtime alerts, Elasticsearch-backed detection rule engine",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "setup": "node src/es/setup.js",
+    "seed": "node src/es/seed.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "^8.15.0",
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "openai": "^6.45.0",
+    "socket.io": "^4.7.5"
+  }
+}

@@ -1,0 +1,51 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: siem-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false   # local dev only — enable for any deployment
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - '9200:9200'
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -s http://localhost:9200/_cluster/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: siem-backend
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - FRONTEND_ORIGIN=http://localhost:5173
+      - PORT=4000
+      # API required here — set these via a real .env file (see backend/.env.example)
+      - CLAUDE_API_KEY=API required here
+      - ABUSEIPDB_API_KEY=API required here
+      - SLACK_WEBHOOK_URL=API required here
+    env_file:
+      - ./backend/.env
+    ports:
+      - '4000:4000'
+    command: sh -c "node src/es/setup.js && node src/index.js"
+
+  frontend:
+    build: ./frontend
+    container_name: siem-frontend
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:4000
+    ports:
+      - '5173:5173'
+
+volumes:
+  es-data:
+
