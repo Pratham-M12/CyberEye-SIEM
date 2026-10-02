@@ -49,7 +49,7 @@ filebeat.inputs:
     pipeline: siem-syslog-normalize
 
 output.elasticsearch:
-  hosts: ['localhost:9200']
+  hosts: ['${CYBEREYE_HOST_IP:localhost}:9200']
   index: 'siem-logs'
   # No auth/TLS for local dev — matches docker-compose's
   # xpack.security.enabled=false. Enable both before any real deployment.

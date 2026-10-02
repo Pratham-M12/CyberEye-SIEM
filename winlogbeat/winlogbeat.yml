@@ -10,7 +10,7 @@ winlogbeat.event_logs:
     event_id: 4624, 4625, 4672, 4688 # login success, login failure, privilege assigned, process create
 
 output.elasticsearch:
-  hosts: ['localhost:9200']
+  hosts: ['${CYBEREYE_HOST_IP:localhost}:9200']
   index: 'siem-logs'
   pipeline: 'siem-windows-normalize'
   # No auth/TLS for local dev — matches docker-compose's
