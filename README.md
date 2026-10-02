@@ -390,28 +390,104 @@ All sensitive values are configured via environment files. **Never commit `.env`
 
 ---
 
-## Windows & Linux Lab Deployment
+## LAN Deployment
 
-CyberEye is structured to ingest telemetry from distributed endpoints and virtual machines:
+CyberEye is structured to ingest telemetry from distributed endpoints and virtual machines across a LAN.
 
-### Lab Network Architecture
-For a safe, contained attack simulation lab:
-- **Host-Only Network**: Configure VMs on an isolated virtual network (e.g., VirtualBox Host-Only subnet `192.168.56.0/24`). The SIEM host machine sits at `192.168.56.1`.
-- **Shipper Configuration**: On the endpoint VMs, configure `filebeat.yml` and `winlogbeat.yml` with the host's Host-Only IP instead of `localhost`:
-  ```yaml
-  output.elasticsearch:
-    hosts: ['192.168.56.1:9200']
-  ```
-- **Windows Firewall**: An inbound firewall rule must be configured on the SIEM host to permit incoming TCP port `9200` packets originating exclusively from `192.168.56.0/24`.
-- **Windows Audit Policy**: To capture Event ID 4625 for R1/R2 testing, the target Windows machine must have audit failure logging explicitly enabled:
+### Architecture
+```text
+Host
+ ├── Docker
+ │    ├── Frontend :5173
+ │    ├── Backend  :4000
+ │    └── Elasticsearch :9200
+ │
+ ├── VM-1
+ │    └── Filebeat / Winlogbeat
+ │
+ └── VM-2
+      └── Filebeat / Winlogbeat
+```
+
+### Prerequisites
+- Docker Desktop (or native Docker) and Docker Compose
+- Node.js v20+ and npm
+- Git
+- At least one Virtual Machine (Windows/Linux) to act as an endpoint
+
+### Bridged Networking
+Each VM should be configured to use a **Bridged Adapter**. This allows the VM to obtain an IP address on the same local subnet as the host machine, enabling direct communication across the LAN.
+
+### Find Host IP
+Determine the IP address of the machine hosting CyberEye on your LAN.
+
+- **Windows**:
   ```powershell
-  auditpol /set /subcategory:"Logon" /success:enable /failure:enable
-  auditpol /set /subcategory:"Special Logon" /success:enable
+  ipconfig
+  ```
+- **Linux**:
+  ```bash
+  ip addr
+  ```
+- **macOS**:
+  ```bash
+  ifconfig
   ```
 
-> [!IMPORTANT]
-> **Endpoint Validation Status**:
-> Windows endpoint integration is prepared, but full end-to-end Winlogbeat validation requires a Windows VM and is currently pending. Linux live ingestion via Filebeat (Snort, Apache/Nginx, Syslog) has been validated.
+### Configure Environment
+Create the root environment configuration file:
+```bash
+cp .env.example .env
+```
+Open `.env` and change `CYBEREYE_HOST_IP` to the host's actual LAN IP:
+```env
+CYBEREYE_HOST_IP=192.168.1.50
+```
+*(Do not put real IPs in the `.env.example` or commit the `.env` file.)*
+
+### Start CyberEye
+Start the Elasticsearch backend first, then bootstrap the data, and finally run the backend and frontend:
+```bash
+docker compose up -d elasticsearch
+cd backend
+npm install && npm run setup
+npm run dev
+# In a new terminal:
+cd ../frontend
+npm install && npm run dev
+```
+Alternatively, if all services are fully containerized in a later deployment, `docker compose up` would be used.
+
+### Verify Connectivity
+From a VM, verify the host is reachable:
+```bash
+ping <CYBEREYE_HOST_IP>
+```
+Verify the frontend loads by visiting `http://<CYBEREYE_HOST_IP>:5173` in a browser on the VM.
+
+### Configure Filebeat/Winlogbeat
+On the endpoint VMs, configure `filebeat.yml` or `winlogbeat.yml` so their Elasticsearch output points to the CyberEye host:
+```yaml
+output.elasticsearch:
+  hosts: ['<CYBEREYE_HOST_IP>:9200']
+```
+(If using the default `.yml` files in this repository, they natively support the `CYBEREYE_HOST_IP` environment variable, or you can manually replace `${CYBEREYE_HOST_IP:localhost}` with the actual IP).
+
+### Verify Ingestion
+1. Start the Beat service on the VM.
+2. Check the Beat logs to ensure successful connection to Elasticsearch.
+3. Open the CyberEye Dashboard at `http://<CYBEREYE_HOST_IP>:5173`.
+4. Navigate to the **Log Explorer** tab to verify that new logs from the VM are appearing in real-time.
+
+### Troubleshooting
+- **VM cannot ping host**: Check if the host's OS firewall is blocking ICMP (ping) requests. Ensure the VM network adapter is set to "Bridged".
+- **Port unavailable**: Ensure no other services are using ports 4000, 5173, or 9200 on the host.
+- **Firewall blocking connection**: Create inbound firewall rules on the host to allow TCP traffic on ports 5173, 4000, and 9200 from the LAN subnet.
+- **Frontend loads but API fails**: Ensure `CYBEREYE_HOST_IP` is properly set in `.env` and `docker-compose.yml` is loading it, so CORS permits the connection.
+- **WebSocket failure**: Check browser developer console for CORS errors. Ensure the backend `FRONTEND_ORIGIN` matches the URL you are using to access the dashboard.
+- **Filebeat/Winlogbeat cannot connect**: Verify Elasticsearch is running (`curl http://<CYBEREYE_HOST_IP>:9200`). Check host firewall for port 9200 blocks.
+- **Incorrect LAN IP**: Re-run `ipconfig`/`ip addr` and verify you are using the correct network adapter's IP (e.g., Wi-Fi or Ethernet, not a virtual switch).
+- **Bridged adapter not receiving LAN address**: Restart the VM's network interface or verify your home router's DHCP pool isn't exhausted.
 
 ---
 
