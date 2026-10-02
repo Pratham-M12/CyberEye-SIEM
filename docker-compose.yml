@@ -24,7 +24,8 @@ services:
         condition: service_healthy
     environment:
       - ELASTICSEARCH_URL=http://elasticsearch:9200
-      - FRONTEND_ORIGIN=http://localhost:5173
+      - FRONTEND_ORIGIN=${FRONTEND_ORIGIN:-http://localhost:5173}
+      - DASHBOARD_BASE_URL=${DASHBOARD_BASE_URL:-http://localhost:5173}
       - PORT=4000
       # API required here — set these via a real .env file (see backend/.env.example)
       - CLAUDE_API_KEY=API required here
