@@ -1,8 +1,7 @@
-//frontend/src/components/UploadPanel.jsx
-
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getUploadConfig, uploadLogFile } from '../api/siem.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 import Panel from "./ui/Panel";
 import PanelHeader from "./ui/PanelHeader";
@@ -17,6 +16,9 @@ const AUTO_SOURCE_BY_EXTENSION = {
 };
 
 export default function UploadPanel() {
+  const { hasRole } = useAuth();
+  const canUpload = hasRole('admin', 'analyst');
+
   const queryClient = useQueryClient();
   const [sourceType, setSourceType] = useState('json');
   const [file, setFile] = useState(null);
@@ -168,13 +170,25 @@ export default function UploadPanel() {
         </div>
 
         <div>
+          {!canUpload && (
+            <div className="mb-4 rounded-lg border border-yellow-600/30 bg-yellow-950/20 px-4 py-2.5 text-xs text-yellow-300 flex items-center gap-2">
+              <span>🔒</span>
+              <span>Log ingestion is restricted to Analysts and Administrators. Your current role has Read-Only permissions.</span>
+            </div>
+          )}
+
           <label
             onDragOver={(event) => {
+              if (!canUpload) return;
               event.preventDefault();
               setDragActive(true);
             }}
-            onDragLeave={() => setDragActive(false)}
+            onDragLeave={() => {
+              if (!canUpload) return;
+              setDragActive(false);
+            }}
             onDrop={(event) => {
+              if (!canUpload) return;
               event.preventDefault();
               setDragActive(false);
               handleFileSelection(event.dataTransfer.files?.[0]);
@@ -188,9 +202,9 @@ export default function UploadPanel() {
             border-dashed
             transition-all
             duration-300
-            hover:scale-[1.01]
+            ${!canUpload ? 'opacity-40 cursor-not-allowed border-hairline bg-raised' : 'hover:scale-[1.01] cursor-pointer'}
             ${
-            dragActive
+            dragActive && canUpload
             ? "border-accent bg-accent/10"
             : "border-hairline bg-raised"
             }`}
@@ -198,6 +212,7 @@ export default function UploadPanel() {
             <input
               type="file"
               accept={accept}
+              disabled={!canUpload}
               className="hidden"
               onChange={(event) => handleFileSelection(event.target.files?.[0])}
             />
@@ -266,7 +281,7 @@ export default function UploadPanel() {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               onClick={handleUpload}
-              disabled={isUploading || isLoading || !file || Boolean(error)}
+              disabled={!canUpload || isUploading || isLoading || !file || Boolean(error)}
               className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-white transition hover:scale-105 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isUploading ? 'uploading...' : 'upload and index'}

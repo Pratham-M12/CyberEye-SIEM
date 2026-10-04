@@ -10,6 +10,7 @@ export const esClient = new Client({
 
 export const LOGS_INDEX = process.env.ES_LOGS_INDEX || 'siem-logs';
 export const ALERTS_INDEX = process.env.ES_ALERTS_INDEX || 'siem-alerts';
+export const USERS_INDEX = process.env.ES_USERS_INDEX || 'siem-users';
 
 export async function pingElasticsearch() {
   try {

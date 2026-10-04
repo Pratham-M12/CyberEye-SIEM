@@ -1,4 +1,4 @@
-import { esClient, LOGS_INDEX, ALERTS_INDEX } from './client.js';
+import { esClient, LOGS_INDEX, ALERTS_INDEX, USERS_INDEX } from './client.js';
 
 // Mapping for the normalized event index. Every log source (Winlogbeat, Snort
 // via Filebeat, Apache/Nginx via Filebeat, syslog) is written here in the
@@ -53,6 +53,22 @@ const alertsMapping = {
       llm_summary: { type: 'text' },
     },
   },
+};
+
+// Mapping for user accounts in Phase 7C RBAC.
+const usersMapping = {
+  mappings: {
+    properties: {
+      username: { type: 'keyword' },
+      passwordHash: { type: 'keyword', index: false },
+      salt: { type: 'keyword', index: false },
+      role: { type: 'keyword' }, // admin | analyst | read_only
+      createdAt: { type: 'date' },
+      updatedAt: { type: 'date' },
+      isActive: { type: 'boolean' },
+      lastLoginAt: { type: 'date' },
+    },
+  },
   settings: {
     number_of_shards: 1,
     number_of_replicas: 0,
@@ -62,6 +78,7 @@ const alertsMapping = {
 export async function ensureIndices() {
   await ensureIndex(LOGS_INDEX, logsMapping);
   await ensureIndex(ALERTS_INDEX, alertsMapping);
+  await ensureIndex(USERS_INDEX, usersMapping);
 }
 
 async function ensureIndex(name, body) {

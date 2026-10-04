@@ -5,10 +5,15 @@ import { Server } from 'socket.io';
 import 'dotenv/config';
 
 import { pingElasticsearch } from './es/client.js';
+import { ensureIndices } from './es/indices.js';
 import { startRuleEngine, runAllRules } from './rules/engine.js';
 import { startEnrichmentPoller } from './enrichment/poller.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
+import { verifyToken } from './auth/jwt.js';
+import { seedAdmin } from './scripts/seedAdmin.js';
 
+import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
 import logsRouter from './routes/logs.js';
 import alertsRouter from './routes/alerts.js';
 import statsRouter from './routes/stats.js';
@@ -45,7 +50,7 @@ app.use(
       }
       return callback(new Error('CORS origin not allowed'));
     },
-    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
@@ -63,6 +68,8 @@ app.get(['/health', '/api/health'], async (req, res) => {
 app.use('/api', apiLimiter);
 
 // Mount feature routers
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
 app.use('/api/logs', logsRouter);
 app.use('/api/alerts', alertsRouter);
 app.use('/api/stats', statsRouter);
@@ -109,8 +116,33 @@ const io = new Server(httpServer, {
 });
 app.set('io', io);
 
+// Socket.IO authentication middleware: verifies JWT from handshake auth token or Authorization header
+io.use((socket, next) => {
+  try {
+    const token =
+      socket.handshake.auth?.token ||
+      (socket.handshake.headers?.authorization && socket.handshake.headers.authorization.startsWith('Bearer ')
+        ? socket.handshake.headers.authorization.slice(7).trim()
+        : null);
+
+    if (!token) {
+      return next(new Error('Authentication required'));
+    }
+
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return next(new Error('Invalid or expired token'));
+    }
+
+    socket.user = decoded;
+    next();
+  } catch (err) {
+    return next(new Error('Authentication failed'));
+  }
+});
+
 io.on('connection', (socket) => {
-  console.log(`[ws] client connected: ${socket.id}`);
+  console.log(`[ws] client connected: ${socket.id} (user: ${socket.user?.username || 'unknown'}, role: ${socket.user?.role || 'none'})`);
   socket.on('disconnect', () => console.log(`[ws] client disconnected: ${socket.id}`));
 });
 
@@ -122,6 +154,13 @@ httpServer.listen(PORT, async () => {
     console.warn(
       '[server] Elasticsearch not reachable yet. Run `docker compose up -d` and `npm run setup` in backend/.'
     );
+  } else {
+    try {
+      await ensureIndices();
+      await seedAdmin();
+    } catch (err) {
+      console.warn('[server] Setup warning:', err.message);
+    }
   }
 
   startRuleEngine(io);

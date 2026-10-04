@@ -7,14 +7,18 @@ import {
   UploadError,
 } from '../uploads/service.js';
 import { uploadLimiter } from '../middleware/rateLimiter.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 
 const router = Router();
+
+// Protect all /api/uploads routes with authentication
+router.use(authenticate);
 
 router.get('/config', (req, res) => {
   res.json(getUploadConfig());
 });
 
-router.post('/', uploadLimiter, async (req, res) => {
+router.post('/', requireRole('admin', 'analyst'), uploadLimiter, async (req, res) => {
   try {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ error: 'Request body must be a valid JSON object' });

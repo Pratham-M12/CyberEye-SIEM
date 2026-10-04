@@ -11,8 +11,12 @@ import {
   isValidTimeWindow,
 } from '../middleware/validate.js';
 import { aiLimiter } from '../middleware/rateLimiter.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 
 const router = Router();
+
+// Protect all /api/alerts routes with authentication
+router.use(authenticate);
 
 // GET /api/alerts?severity=critical&status=open&page=1&pageSize=50
 router.get('/', async (req, res) => {
@@ -109,8 +113,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/alerts/:id/summary — on-demand LLM analyst summary
-router.post('/:id/summary', aiLimiter, async (req, res) => {
+// POST /api/alerts/:id/summary — on-demand LLM analyst summary (Admin + Analyst)
+router.post('/:id/summary', requireRole('admin', 'analyst'), aiLimiter, async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidId(id)) {
@@ -144,8 +148,8 @@ router.post('/:id/summary', aiLimiter, async (req, res) => {
   }
 });
 
-// POST /api/alerts/:id/investigate
-router.post('/:id/investigate', aiLimiter, async (req, res) => {
+// POST /api/alerts/:id/investigate (Admin + Analyst)
+router.post('/:id/investigate', requireRole('admin', 'analyst'), aiLimiter, async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidId(id)) {
@@ -163,8 +167,8 @@ router.post('/:id/investigate', aiLimiter, async (req, res) => {
   }
 });
 
-// PATCH /api/alerts/:id/status — { status: "acknowledged" | "closed" | "open" }
-router.patch('/:id/status', async (req, res) => {
+// PATCH /api/alerts/:id/status — { status: "acknowledged" | "closed" | "open" } (Admin + Analyst)
+router.patch('/:id/status', requireRole('admin', 'analyst'), async (req, res) => {
   try {
     const { id } = req.params;
     if (!isValidId(id)) {
@@ -185,6 +189,7 @@ router.patch('/:id/status', async (req, res) => {
 
     const source = existing._source;
     const now = new Date().toISOString();
+    const actor = req.user?.username || 'system';
 
     const history = Array.isArray(source.history)
       ? [...source.history]
@@ -203,7 +208,7 @@ router.patch('/:id/status', async (req, res) => {
     history.push({
       action: status,
       status,
-      by: 'local-user',
+      by: actor,
       timestamp: now,
     });
 
@@ -213,7 +218,7 @@ router.patch('/:id/status', async (req, res) => {
       doc: {
         status,
         updatedAt: now,
-        updatedBy: 'local-user',
+        updatedBy: actor,
         history,
       },
     });

@@ -1,10 +1,10 @@
-//frontend/src/components/AlertDrawer.jsx
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import SeverityBadge from './SeverityBadge.jsx';
 import AlertTimeline from "./AlertTimeline.jsx";
 import JsonViewer from "./JsonViewer.jsx";
 import AIInvestigation from "./AIInvestigation.jsx";
-import {  getAlert, investigateAlert, setAlertStatus  } from "../api/siem.js";
+import { getAlert, investigateAlert, setAlertStatus } from "../api/siem.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const RULE_DESCRIPTIONS = {
   R1: 'Fires when a single source IP produces 5 or more failed Windows logins (Event ID 4625) within a 60 second window — the signature of an automated brute-force attempt.',
@@ -29,6 +29,8 @@ function formatTime(ts) {
 
 export default function AlertDrawer({ alertId, onClose }) {
   const queryClient = useQueryClient();
+  const { hasRole } = useAuth();
+  const canTriage = hasRole('admin', 'analyst');
 
   const { data: alert, isLoading } = useQuery({
     queryKey: ['alert', alertId],
@@ -125,7 +127,7 @@ export default function AlertDrawer({ alertId, onClose }) {
                   <h3 className="font-mono text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
                     AI Investigation
                   </h3>
-                  {!investigationMutation.data && !alert.ai_investigation && (
+                  {canTriage && !investigationMutation.data && !alert.ai_investigation && (
                     <button
                       onClick={() => investigationMutation.mutate()}
                       disabled={investigationMutation.isPending}
@@ -137,6 +139,11 @@ export default function AlertDrawer({ alertId, onClose }) {
                           : "🔍 Investigate"
                       }
                     </button>
+                  )}
+                  {!canTriage && !alert.ai_investigation && (
+                    <span className="text-[11px] text-ink-muted italic">
+                      Investigation restricted (Analyst/Admin only)
+                    </span>
                   )}
                 </div>
                 <div className="mt-4">
@@ -188,17 +195,25 @@ export default function AlertDrawer({ alertId, onClose }) {
                 </div>
               </section>
 
-              <section className="flex gap-2 border-t border-hairline pt-4">
-                {['acknowledged', 'closed', 'open'].map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => statusMutation.mutate(status)}
-                    disabled={alert.status === status || statusMutation.isPending}
-                    className="rounded-md border border-hairline px-3 py-1.5 font-mono text-xs capitalize text-ink-primary hover:border-accent disabled:opacity-30"
-                  >
-                    mark {status}
-                  </button>
-                ))}
+              <section className="border-t border-hairline pt-4">
+                {canTriage ? (
+                  <div className="flex gap-2">
+                    {['acknowledged', 'closed', 'open'].map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => statusMutation.mutate(status)}
+                        disabled={alert.status === status || statusMutation.isPending}
+                        className="rounded-md border border-hairline px-3 py-1.5 font-mono text-xs capitalize text-ink-primary hover:border-accent disabled:opacity-30"
+                      >
+                        mark {status}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs font-mono text-ink-muted italic">
+                    Read-only role: Alert status triage is restricted to Analysts and Administrators.
+                  </div>
+                )}
               </section>
             </div>
           </div>

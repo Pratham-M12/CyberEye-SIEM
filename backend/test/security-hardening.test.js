@@ -1,7 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { signToken } from '../src/auth/jwt.js';
 
 const BASE_URL = process.env.TEST_API_URL || 'http://localhost:4000';
+
+const testToken = signToken({ id: 'test-admin', username: 'test-admin', role: 'admin' });
+const originalFetch = globalThis.fetch;
+globalThis.fetch = (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  if (!headers.has('Authorization') && typeof url === 'string' && url.includes('/api/')) {
+    headers.set('Authorization', `Bearer ${testToken}`);
+  }
+  return originalFetch(url, { ...options, headers });
+};
 
 test('Security Hardening — HTTP Headers & Fingerprinting', async (t) => {
   await t.test('Server does not expose X-Powered-By header', async () => {

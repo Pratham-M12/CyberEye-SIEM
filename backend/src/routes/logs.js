@@ -7,12 +7,13 @@ import {
   isValidDateString,
   sanitizeSearchQuery,
 } from '../middleware/validate.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
 // GET /api/logs?source=windows&event_type=auth_failure&severity=high
 //     &from=2026-07-01T00:00:00Z&to=2026-07-02T00:00:00Z&page=1&pageSize=50&q=free+text
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
     const {
       source,

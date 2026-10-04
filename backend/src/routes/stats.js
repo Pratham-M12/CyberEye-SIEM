@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import { esClient, LOGS_INDEX, ALERTS_INDEX } from '../es/client.js';
 import { isValidTimeWindow, isValidInterval } from '../middleware/validate.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
+
+// Protect all /api/stats routes with authentication
+router.use(authenticate);
 
 // GET /api/stats/timeline?window=24h&interval=1h
 // Event volume by log source, bucketed over time — feeds the Recharts area chart.

@@ -8,6 +8,11 @@ import { writeAlerts, hasRecentAlert } from '../src/alerts/writer.js';
 import { checkIp } from '../src/enrichment/abuseipdb.js';
 import { pollAndEnrich } from '../src/enrichment/poller.js';
 import { notifySlack, formatSlackMessage, notifiedAlertIds } from '../src/enrichment/slack.js';
+import { signToken } from '../src/auth/jwt.js';
+
+const testToken = signToken({ id: 'e2e-admin', username: 'e2e-admin', role: 'admin' });
+const authHeaders = { Authorization: `Bearer ${testToken}` };
+
 
 async function main() {
   console.log('=== PHASE 6D FULL E2E INTEGRATION TEST ===\n');
@@ -46,6 +51,7 @@ async function main() {
   const socket = Client('http://localhost:4000', {
     transports: ['websocket'],
     reconnection: false,
+    auth: { token: testToken },
   });
 
   await new Promise((resolve, reject) => {
@@ -232,13 +238,13 @@ async function main() {
 
   // 8. DASHBOARD / API VERIFICATION
   console.log('\n--- Step 9: Dashboard / API Verification ---');
-  const apiAlerts = await fetch('http://localhost:4000/api/alerts?severity=critical').then(r => r.json());
+  const apiAlerts = await fetch('http://localhost:4000/api/alerts?severity=critical', { headers: authHeaders }).then(r => r.json());
   const foundInApi = (apiAlerts.alerts || []).some(a => a.rule_id === 'R2' && a.source_ip === testIp);
   console.log(`R2 alert visible in GET /api/alerts: ${foundInApi ? 'YES' : 'NO'} (Total in API: ${apiAlerts.total})`);
 
   let singleAlertDetailsOk = false;
   if (r2AlertId) {
-    const singleAlert = await fetch(`http://localhost:4000/api/alerts/${r2AlertId}`).then(r => r.json());
+    const singleAlert = await fetch(`http://localhost:4000/api/alerts/${r2AlertId}`, { headers: authHeaders }).then(r => r.json());
     singleAlertDetailsOk = singleAlert.id === r2AlertId && singleAlert.severity === 'critical';
     console.log(`GET /api/alerts/${r2AlertId}: ${singleAlertDetailsOk ? 'OK' : 'FAIL'}`);
   }
