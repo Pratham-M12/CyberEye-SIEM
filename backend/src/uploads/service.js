@@ -128,6 +128,11 @@ export async function ingestUploadedFile({
     throw new UploadError(400, 'fileName is required.');
   }
 
+  const sanitizedFileName = path.basename(fileName).trim();
+  if (!sanitizedFileName || sanitizedFileName.length > 255 || /[\0\r\n]/.test(sanitizedFileName)) {
+    throw new UploadError(400, 'Invalid fileName provided.');
+  }
+
   if (!content || typeof content !== 'string') {
     throw new UploadError(400, 'content is required.');
   }
@@ -139,7 +144,7 @@ export async function ingestUploadedFile({
     );
   }
 
-  validateFileExtension(fileName, uploadType);
+  validateFileExtension(sanitizedFileName, uploadType);
 
   const actualSizeBytes = getActualSizeBytes(content, encoding);
   const declaredSizeBytes =
@@ -158,7 +163,7 @@ export async function ingestUploadedFile({
     uploadId,
     uploadedAt,
     sourceType: uploadType.id,
-    fileName,
+    fileName: sanitizedFileName,
     fileSize: declaredSizeBytes,
   };
 
@@ -201,7 +206,7 @@ export async function ingestUploadedFile({
 
   return {
     uploadId,
-    fileName,
+    fileName: sanitizedFileName,
     sourceType: uploadType.id,
     indexedCount: parsed.docs.length - failedItems.length,
     failedCount: failedItems.length,
@@ -585,11 +590,20 @@ $events | ConvertTo-Json -Depth 6 -Compress
   return parsed ? [parsed] : [];
 }
 
-function spawnAndCollect(command, args, options = {}) {
+function spawnAndCollect(command, args, options = {}, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, options);
     let stdout = '';
     let stderr = '';
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        child.kill();
+        reject(new UploadError(500, 'Process execution timed out.'));
+      }
+    }, timeoutMs);
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString();
@@ -599,8 +613,21 @@ function spawnAndCollect(command, args, options = {}) {
       stderr += chunk.toString();
     });
 
-    child.on('error', reject);
-    child.on('close', (exitCode) => resolve({ stdout, stderr, exitCode }));
+    child.on('error', (err) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      }
+    });
+
+    child.on('close', (exitCode) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve({ stdout, stderr, exitCode });
+      }
+    });
   });
 }
 

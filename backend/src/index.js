@@ -7,6 +7,7 @@ import 'dotenv/config';
 import { pingElasticsearch } from './es/client.js';
 import { startRuleEngine, runAllRules } from './rules/engine.js';
 import { startEnrichmentPoller } from './enrichment/poller.js';
+import { apiLimiter } from './middleware/rateLimiter.js';
 
 import logsRouter from './routes/logs.js';
 import alertsRouter from './routes/alerts.js';
@@ -15,25 +16,96 @@ import uploadsRouter from './routes/uploads.js';
 import { MAX_UPLOAD_SIZE_MB } from './uploads/service.js';
 
 const PORT = process.env.PORT || 4000;
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 const app = express();
-app.use(cors({ origin: FRONTEND_ORIGIN }));
+
+// Disable Express fingerprinting header
+app.disable('x-powered-by');
+
+// Standard security headers without extra third-party dependencies
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '0');
+  next();
+});
+
+// Hardened CORS configuration supporting specific origins or LAN IPs
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. server-to-server, curl, health probes)
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+      return callback(new Error('CORS origin not allowed'));
+    },
+    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
+// Apply JSON body parser with strict size limit
 app.use(express.json({ limit: `${Math.max(2, MAX_UPLOAD_SIZE_MB * 2)}mb` }));
 
-app.get('/api/health', async (req, res) => {
+// Health check endpoint (safe: only returns boolean/status, no credentials or env vars)
+app.get(['/health', '/api/health'], async (req, res) => {
   const esOk = await pingElasticsearch();
   res.json({ status: esOk ? 'ok' : 'degraded', elasticsearch: esOk });
 });
 
+// Apply conservative rate limiting to all API routes
+app.use('/api', apiLimiter);
+
+// Mount feature routers
 app.use('/api/logs', logsRouter);
 app.use('/api/alerts', alertsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/uploads', uploadsRouter);
 
+// Convenience aliases for summary, timeline, and top-attackers
+app.use('/api/summary', (req, res, next) => {
+  req.url = '/summary' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+  statsRouter(req, res, next);
+});
+app.use('/api/timeline', (req, res, next) => {
+  req.url = '/timeline' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+  statsRouter(req, res, next);
+});
+app.use('/api/top-attackers', (req, res, next) => {
+  req.url = '/top-attackers' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+  alertsRouter(req, res, next);
+});
+
+// 404 handler for undefined API routes
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
+
+// Global error handling middleware (prevents stack traces and raw error disclosure)
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Malformed JSON payload' });
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Payload exceeds maximum allowed size' });
+  }
+  if (err.message === 'CORS origin not allowed') {
+    return res.status(403).json({ error: 'CORS request blocked from this origin' });
+  }
+
+  console.error('[server] unhandled error:', err.message);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: FRONTEND_ORIGIN },
+  cors: { origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins },
 });
 app.set('io', io);
 
@@ -57,5 +129,6 @@ httpServer.listen(PORT, async () => {
 
   // Run one rule engine pass immediately on boot rather than waiting for the
   // first cron tick, so a freshly-started demo shows alerts sooner.
-  runAllRules(io).catch((err) => console.error('[rules] initial run failed:', err));
+  runAllRules(io).catch((err) => console.error('[rules] initial run failed:', err.message));
 });
+

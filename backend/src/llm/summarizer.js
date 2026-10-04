@@ -24,29 +24,37 @@ export async function summarizeAlert(alert) {
 
   const prompt = buildPrompt(alert);
 
-  const res = await axios.post(
-    CLAUDE_API_URL,
-    {
-      model: CLAUDE_MODEL,
-      max_tokens: 300,
-      messages: [{ role: 'user', content: prompt }],
-    },
-    {
-      headers: {
-        'x-api-key': CLAUDE_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
+  try {
+    const res = await axios.post(
+      CLAUDE_API_URL,
+      {
+        model: CLAUDE_MODEL,
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }],
       },
-    }
-  );
+      {
+        headers: {
+          'x-api-key': CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        timeout: 15000,
+      }
+    );
 
-  const summary = res.data?.content
-    ?.filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join(' ')
-    .trim();
+    const summary = res.data?.content
+      ?.filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join(' ')
+      .trim();
 
-  return { summary: summary || 'No summary returned.', generated: true };
+    return { summary: summary || 'No summary returned.', generated: true };
+  } catch (err) {
+    const safeMsg =
+      err.response?.data?.error?.message ||
+      (err.response?.status ? `HTTP ${err.response.status}` : err.message);
+    throw new Error(`LLM summary failed: ${safeMsg}`);
+  }
 }
 
 function buildPrompt(alert) {

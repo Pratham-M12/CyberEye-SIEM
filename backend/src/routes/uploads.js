@@ -6,6 +6,7 @@ import {
   ingestUploadedFile,
   UploadError,
 } from '../uploads/service.js';
+import { uploadLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
@@ -13,8 +14,12 @@ router.get('/config', (req, res) => {
   res.json(getUploadConfig());
 });
 
-router.post('/', async (req, res) => {
+router.post('/', uploadLimiter, async (req, res) => {
   try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ error: 'Request body must be a valid JSON object' });
+    }
+
     const uploadResult = await ingestUploadedFile(req.body);
     const rulesResult = await runAllRules(req.app.get('io'));
 
@@ -27,7 +32,7 @@ router.post('/', async (req, res) => {
       return res.status(err.statusCode).json({ error: err.message });
     }
 
-    console.error('[api] POST /uploads failed:', err);
+    console.error('[api] POST /uploads failed:', err.message);
     res.status(500).json({ error: 'Failed to process upload' });
   }
 });

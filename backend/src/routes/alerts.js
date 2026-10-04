@@ -1,9 +1,16 @@
 // backend/src/routes/alerts.js
 import { Router } from 'express';
 import { esClient, ALERTS_INDEX } from '../es/client.js';
-import { summarizeAlert } from "../llm/summarizer.js";
-import { investigateAlert } from "../llm/investigator.js";
-import { generateInvestigation } from "../services/investigationService.js";
+import { summarizeAlert } from '../llm/summarizer.js';
+import { generateInvestigation } from '../services/investigationService.js';
+import {
+  validatePagination,
+  isValidId,
+  isValidSeverity,
+  isValidStatus,
+  isValidTimeWindow,
+} from '../middleware/validate.js';
+import { aiLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
@@ -12,12 +19,22 @@ router.get('/', async (req, res) => {
   try {
     const { severity, status, page = '1', pageSize = '50' } = req.query;
 
+    const { pageNum, size, error: pagError } = validatePagination(page, pageSize);
+    if (pagError) {
+      return res.status(400).json({ error: pagError });
+    }
+
+    if (severity && !isValidSeverity(severity)) {
+      return res.status(400).json({ error: 'Invalid severity parameter' });
+    }
+
+    if (status && !isValidStatus(status)) {
+      return res.status(400).json({ error: 'Invalid status parameter' });
+    }
+
     const filter = [];
     if (severity) filter.push({ term: { severity } });
     if (status) filter.push({ term: { status } });
-
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const size = Math.min(200, parseInt(pageSize, 10) || 50);
 
     const result = await esClient.search({
       index: ALERTS_INDEX,
@@ -34,7 +51,7 @@ router.get('/', async (req, res) => {
       alerts: result.hits.hits.map((h) => ({ id: h._id, ...h._source })),
     });
   } catch (err) {
-    console.error('[api] GET /alerts failed:', err);
+    console.error('[api] GET /alerts failed:', err.message);
     res.status(500).json({ error: 'Failed to query alerts' });
   }
 });
@@ -44,6 +61,12 @@ router.get('/top-attackers', async (req, res) => {
   try {
     const { window = '24h', limit = '10' } = req.query;
 
+    if (!isValidTimeWindow(window)) {
+      return res.status(400).json({ error: 'Invalid window parameter. Allowed format: 15m, 1h, 24h, 7d' });
+    }
+
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
+
     const result = await esClient.search({
       index: ALERTS_INDEX,
       size: 0,
@@ -52,7 +75,7 @@ router.get('/top-attackers', async (req, res) => {
       },
       aggs: {
         top_ips: {
-          terms: { field: 'source_ip', size: parseInt(limit, 10) || 10 },
+          terms: { field: 'source_ip', size: limitNum },
         },
       },
     });
@@ -62,7 +85,7 @@ router.get('/top-attackers', async (req, res) => {
       attackers: buckets.map((b) => ({ source_ip: b.key, alert_count: b.doc_count })),
     });
   } catch (err) {
-    console.error('[api] GET /alerts/top-attackers failed:', err);
+    console.error('[api] GET /alerts/top-attackers failed:', err.message);
     res.status(500).json({ error: 'Failed to compute top attackers' });
   }
 });
@@ -70,23 +93,31 @@ router.get('/top-attackers', async (req, res) => {
 // GET /api/alerts/:id
 router.get('/:id', async (req, res) => {
   try {
-    const doc = await esClient.get({ index: ALERTS_INDEX, id: req.params.id });
+    const { id } = req.params;
+    if (!isValidId(id)) {
+      return res.status(400).json({ error: 'Invalid alert ID' });
+    }
+
+    const doc = await esClient.get({ index: ALERTS_INDEX, id });
     res.json({ id: doc._id, ...doc._source });
   } catch (err) {
     if (err.meta?.statusCode === 404) {
       return res.status(404).json({ error: 'Alert not found' });
     }
-    console.error('[api] GET /alerts/:id failed:', err);
+    console.error('[api] GET /alerts/:id failed:', err.message);
     res.status(500).json({ error: 'Failed to fetch alert' });
   }
 });
 
-// POST /api/alerts/:id/summary — on-demand LLM analyst summary, called when
-// the Alert Detail drawer opens. Result is cached back onto the alert doc so
-// repeat opens don't re-call the Claude API.
-router.post('/:id/summary', async (req, res) => {
+// POST /api/alerts/:id/summary — on-demand LLM analyst summary
+router.post('/:id/summary', aiLimiter, async (req, res) => {
   try {
-    const doc = await esClient.get({ index: ALERTS_INDEX, id: req.params.id });
+    const { id } = req.params;
+    if (!isValidId(id)) {
+      return res.status(400).json({ error: 'Invalid alert ID' });
+    }
+
+    const doc = await esClient.get({ index: ALERTS_INDEX, id });
     const alert = { id: doc._id, ...doc._source };
 
     if (alert.llm_summary) {
@@ -105,30 +136,42 @@ router.post('/:id/summary', async (req, res) => {
 
     res.json({ summary, generated, cached: false });
   } catch (err) {
-    console.error('[api] POST /alerts/:id/summary failed:', err);
+    if (err.meta?.statusCode === 404) {
+      return res.status(404).json({ error: 'Alert not found' });
+    }
+    console.error('[api] POST /alerts/:id/summary failed:', err.message);
     res.status(500).json({ error: 'Failed to generate summary' });
   }
 });
 
 // POST /api/alerts/:id/investigate
-router.post("/:id/investigate", async(req,res)=>{
-    try{
-        const result = await generateInvestigation(req.params.id);
-        res.json(result);
+router.post('/:id/investigate', aiLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidId(id)) {
+      return res.status(400).json({ error: 'Invalid alert ID' });
     }
-    catch(err){
-        console.error(err);
-        res.status(500).json({
-            error:"Failed to generate investigation"
-        });
+
+    const result = await generateInvestigation(id);
+    res.json(result);
+  } catch (err) {
+    if (err.meta?.statusCode === 404) {
+      return res.status(404).json({ error: 'Alert not found' });
     }
+    console.error('[api] POST /alerts/:id/investigate failed:', err.message);
+    res.status(500).json({ error: 'Failed to generate investigation' });
+  }
 });
 
 // PATCH /api/alerts/:id/status — { status: "acknowledged" | "closed" | "open" }
 router.patch('/:id/status', async (req, res) => {
   try {
-    const { status } = req.body;
+    const { id } = req.params;
+    if (!isValidId(id)) {
+      return res.status(400).json({ error: 'Invalid alert ID' });
+    }
 
+    const { status } = req.body || {};
     if (!['open', 'acknowledged', 'closed'].includes(status)) {
       return res.status(400).json({
         error: 'Invalid status',
@@ -137,11 +180,10 @@ router.patch('/:id/status', async (req, res) => {
 
     const existing = await esClient.get({
       index: ALERTS_INDEX,
-      id: req.params.id,
+      id,
     });
 
     const source = existing._source;
-
     const now = new Date().toISOString();
 
     const history = Array.isArray(source.history)
@@ -167,7 +209,7 @@ router.patch('/:id/status', async (req, res) => {
 
     await esClient.update({
       index: ALERTS_INDEX,
-      id: req.params.id,
+      id,
       doc: {
         status,
         updatedAt: now,
@@ -177,13 +219,15 @@ router.patch('/:id/status', async (req, res) => {
     });
 
     res.json({
-      id: req.params.id,
+      id,
       status,
       updatedAt: now,
     });
   } catch (err) {
-    console.error(err);
-
+    if (err.meta?.statusCode === 404) {
+      return res.status(404).json({ error: 'Alert not found' });
+    }
+    console.error('[api] PATCH /alerts/:id/status failed:', err.message);
     res.status(500).json({
       error: 'Failed to update alert status',
     });

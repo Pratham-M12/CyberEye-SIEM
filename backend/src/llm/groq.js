@@ -10,36 +10,29 @@ const MODEL =
     "openai/gpt-oss-20b";
 
 export async function investigateWithGroq(prompt){
-
-    const response = await client.chat.completions.create({
-
-        model: MODEL,
-
-        temperature: 0.2,
-
-        response_format:{
-            type:"json_object"
-        },
-
-        messages:[
-
-            {
-                role:"system",
-                content:
-                    "You are an expert SOC Analyst."
+    try {
+        const response = await client.chat.completions.create({
+            model: MODEL,
+            temperature: 0.2,
+            response_format:{
+                type:"json_object"
             },
+            messages:[
+                {
+                    role:"system",
+                    content: "You are an expert SOC Analyst."
+                },
+                {
+                    role:"user",
+                    content:prompt
+                }
+            ]
+        }, { timeout: 30000 });
 
-            {
-                role:"user",
-                content:prompt
-            }
-
-        ]
-
-    });
-
-    return JSON.parse(
-        response.choices[0].message.content
-    );
-
+        return JSON.parse(
+            response.choices[0].message.content
+        );
+    } catch (err) {
+        throw new Error(`Groq investigation failed: ${err.message}`);
+    }
 }

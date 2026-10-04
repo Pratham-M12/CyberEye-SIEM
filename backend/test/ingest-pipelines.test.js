@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { esClient } from '../src/es/client.js';
+import { esClient, pingElasticsearch } from '../src/es/client.js';
+
+const esAvailable = await pingElasticsearch();
+const skipOpt = { skip: !esAvailable ? 'Elasticsearch not reachable — skipping live pipeline simulation' : false };
 
 async function simulate(pipelineId, docs) {
   const res = await esClient.ingest.simulate({
@@ -10,7 +13,8 @@ async function simulate(pipelineId, docs) {
   return res.docs.map((d) => d.doc?._source || d);
 }
 
-test('siem-snort-normalize parses raw fast-alert messages into canonical network fields', async () => {
+test('siem-snort-normalize parses raw fast-alert messages into canonical network fields', skipOpt, async () => {
+
   const docs = [
     {
       message:
@@ -46,7 +50,7 @@ test('siem-snort-normalize parses raw fast-alert messages into canonical network
   assert.equal(results[2].event?.severity, 'high');
 });
 
-test('siem-web-normalize parses raw access logs and detects SQLi / XSS attacks', async () => {
+test('siem-web-normalize parses raw access logs and detects SQLi / XSS attacks', skipOpt, async () => {
   const docs = [
     {
       event: { module: 'nginx' },
@@ -101,7 +105,7 @@ test('siem-web-normalize parses raw access logs and detects SQLi / XSS attacks',
   assert.equal(results[3].event?.severity, 'low');
 });
 
-test('siem-syslog-normalize parses raw syslog and auth logs into canonical host, auth, and privilege fields', async () => {
+test('siem-syslog-normalize parses raw syslog and auth logs into canonical host, auth, and privilege fields', skipOpt, async () => {
   const docs = [
     {
       message:
@@ -158,7 +162,7 @@ test('siem-syslog-normalize parses raw syslog and auth logs into canonical host,
   assert.equal(results[4].event?.severity, 'low');
 });
 
-test('siem-windows-normalize preserves Windows Event ID mapping', async () => {
+test('siem-windows-normalize preserves Windows Event ID mapping', skipOpt, async () => {
   const docs = [
     {
       winlog: {
@@ -191,7 +195,7 @@ test('siem-windows-normalize preserves Windows Event ID mapping', async () => {
   assert.equal(results[1].event?.severity, 'low');
 });
 
-test('siem-windows-normalize handles valid IP and ignores "-" IpAddress', async () => {
+test('siem-windows-normalize handles valid IP and ignores "-" IpAddress', skipOpt, async () => {
   const docs = [
     // Test A: Windows 4624 with IpAddress = "192.168.56.20"
     {

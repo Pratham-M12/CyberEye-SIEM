@@ -1,6 +1,12 @@
-// backend/src/routes/logs.js
 import { Router } from 'express';
 import { esClient, LOGS_INDEX } from '../es/client.js';
+import {
+  validatePagination,
+  isValidIp,
+  isValidSeverity,
+  isValidDateString,
+  sanitizeSearchQuery,
+} from '../middleware/validate.js';
 
 const router = Router();
 
@@ -20,9 +26,36 @@ router.get('/', async (req, res) => {
       q,
     } = req.query;
 
+    const { pageNum, size, error: pagError } = validatePagination(page, pageSize);
+    if (pagError) {
+      return res.status(400).json({ error: pagError });
+    }
+
+    if (severity && !isValidSeverity(severity)) {
+      return res.status(400).json({ error: 'Invalid severity parameter' });
+    }
+
+    if (sourceIp && !isValidIp(sourceIp)) {
+      return res.status(400).json({ error: 'Invalid source_ip parameter' });
+    }
+
+    if (from && !isValidDateString(from)) {
+      return res.status(400).json({ error: 'Invalid "from" timestamp format' });
+    }
+
+    if (to && !isValidDateString(to)) {
+      return res.status(400).json({ error: 'Invalid "to" timestamp format' });
+    }
+
     const filter = [];
-    if (source) filter.push({ term: { 'log.source': source } });
-    if (eventType) filter.push({ term: { 'event.type': eventType } });
+    if (source) {
+      const cleanSource = String(source).trim().slice(0, 100);
+      filter.push({ term: { 'log.source': cleanSource } });
+    }
+    if (eventType) {
+      const cleanEventType = String(eventType).trim().slice(0, 100);
+      filter.push({ term: { 'event.type': cleanEventType } });
+    }
     if (severity) filter.push({ term: { 'event.severity': severity } });
     if (sourceIp) filter.push({ term: { 'source.ip': sourceIp } });
     if (from || to) {
@@ -36,10 +69,10 @@ router.get('/', async (req, res) => {
       });
     }
 
-    const must = q ? [{ query_string: { query: q, default_field: 'raw_message' } }] : [];
-
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const size = Math.min(200, parseInt(pageSize, 10) || 50);
+    const sanitizedQ = sanitizeSearchQuery(q);
+    const must = sanitizedQ
+      ? [{ simple_query_string: { query: sanitizedQ, fields: ['raw_message'] } }]
+      : [];
 
     const result = await esClient.search({
       index: LOGS_INDEX,
@@ -56,7 +89,7 @@ router.get('/', async (req, res) => {
       logs: result.hits.hits.map((h) => ({ id: h._id, ...h._source })),
     });
   } catch (err) {
-    console.error('[api] GET /logs failed:', err);
+    console.error('[api] GET /logs failed:', err.message);
     res.status(500).json({ error: 'Failed to query logs' });
   }
 });

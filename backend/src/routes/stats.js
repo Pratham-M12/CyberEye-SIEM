@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { esClient, LOGS_INDEX, ALERTS_INDEX } from '../es/client.js';
+import { isValidTimeWindow, isValidInterval } from '../middleware/validate.js';
 
 const router = Router();
 
@@ -8,6 +9,14 @@ const router = Router();
 router.get('/timeline', async (req, res) => {
   try {
     const { window = '24h', interval = '1h' } = req.query;
+
+    if (!isValidTimeWindow(window)) {
+      return res.status(400).json({ error: 'Invalid window parameter. Allowed format: 15m, 1h, 24h, 7d' });
+    }
+
+    if (!isValidInterval(interval)) {
+      return res.status(400).json({ error: 'Invalid interval parameter. Allowed format: 1m, 5m, 1h, 1d' });
+    }
 
     const result = await esClient.search({
       index: LOGS_INDEX,
@@ -36,7 +45,7 @@ router.get('/timeline', async (req, res) => {
 
     res.json({ timeline });
   } catch (err) {
-    console.error('[api] GET /stats/timeline failed:', err);
+    console.error('[api] GET /stats/timeline failed:', err.message);
     res.status(500).json({ error: 'Failed to compute timeline' });
   }
 });
@@ -59,7 +68,7 @@ router.get('/summary', async (req, res) => {
       open_critical_alerts: criticalAlerts.count,
     });
   } catch (err) {
-    console.error('[api] GET /stats/summary failed:', err);
+    console.error('[api] GET /stats/summary failed:', err.message);
     res.status(500).json({ error: 'Failed to compute summary' });
   }
 });

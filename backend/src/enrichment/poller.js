@@ -16,7 +16,7 @@ export function startEnrichmentPoller() {
   });
 }
 
-async function pollAndEnrich() {
+export async function pollAndEnrich() {
   const res = await esClient.search({
     index: LOGS_INDEX,
     size: BATCH_SIZE,
@@ -26,14 +26,14 @@ async function pollAndEnrich() {
         must_not: [{ exists: { field: 'threat.score' } }],
       },
     },
-    _source: ['source.ip'],
+    _source: ['source.ip', 'source'],
   });
 
   const hits = res.hits.hits;
   if (hits.length === 0) return;
 
   for (const hit of hits) {
-    const sourceIp = hit._source?.['source.ip'];
+    const sourceIp = hit._source?.['source.ip'] || hit._source?.source?.ip;
     if (!sourceIp) continue;
     await enrichIngestedEvent(hit._id, sourceIp);
   }
