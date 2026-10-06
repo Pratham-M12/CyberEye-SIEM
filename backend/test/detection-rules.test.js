@@ -193,6 +193,108 @@ test('R5 rejects nested ECS login for a different user or occurring after privil
   assert.equal(buildCandidateForPrivilegeEvent(privilege, [laterLogin]), null);
 });
 
+test('R5 rejects routine Windows SYSTEM and service account privilege activity', () => {
+  const serviceUsers = [
+    'SYSTEM',
+    'system',
+    'NT AUTHORITY\\SYSTEM',
+    'LOCAL SERVICE',
+    'NETWORK SERVICE',
+    'ANONYMOUS LOGON',
+    'DWM-1',
+    'UMFD-0',
+    'WINDOWS$',
+  ];
+
+  for (const user of serviceUsers) {
+    const login = windowsEvent('auth_success', -120, { user });
+    const privilege = windowsEvent('privilege_assigned', -10, { user });
+    assert.equal(
+      buildCandidateForPrivilegeEvent(privilege, [login]),
+      null,
+      `R5 should not fire for service account: ${user}`
+    );
+
+    const nestedLogin = nestedWindowsEvent('auth_success', -120, { user });
+    const nestedPriv = nestedWindowsEvent('privilege_assigned', -10, { user });
+    assert.equal(
+      buildCandidateForPrivilegeEvent(nestedPriv, [nestedLogin]),
+      null,
+      `R5 should not fire for nested service account: ${user}`
+    );
+  }
+});
+
+test('R5 correlates cybereye-test when 4624 and 4672 share the exact millisecond timestamp', () => {
+  const ts = at(-30);
+  const login = {
+    '@timestamp': ts,
+    event: { type: 'auth_success' },
+    log: { source: 'windows' },
+    source: { ip: '127.0.0.1' },
+    user: { name: 'cybereye-test' },
+    host: { name: 'windows' },
+    winlog: { record_id: 10718 },
+  };
+  const privilege = {
+    '@timestamp': ts,
+    event: { type: 'privilege_assigned' },
+    log: { source: 'windows' },
+    user: { name: 'cybereye-test' },
+    host: { name: 'windows' },
+    winlog: { record_id: 10720 },
+  };
+
+  const candidate = buildCandidateForPrivilegeEvent(privilege, [login]);
+  assert.ok(candidate, 'R5 should fire for controlled cybereye-test logon sequence');
+  assert.equal(candidate.rule_id, 'R5');
+  assert.equal(candidate.severity, 'critical');
+  assert.equal(candidate.affected_user, 'cybereye-test');
+  assert.equal(candidate.source_ip, '127.0.0.1');
+  assert.equal(candidate.affected_host, 'windows');
+  assert.deepEqual(candidate.evidence, [login, privilege]);
+});
+
+test('R5 rejects mismatched users between auth_success and privilege_assigned', () => {
+  const login = windowsEvent('auth_success', -120, { user: 'cybereye-test' });
+  const privilege = windowsEvent('privilege_assigned', -10, { user: 'operator' });
+
+  assert.equal(buildCandidateForPrivilegeEvent(privilege, [login]), null);
+});
+
+test('R5 rejects wrong event ordering (login after privilege assignment or later record ID)', () => {
+  // Case 1: Login timestamp strictly later than privilege timestamp
+  const earlierPriv = windowsEvent('privilege_assigned', -120, { user: 'cybereye-test' });
+  const laterLogin = windowsEvent('auth_success', -10, { user: 'cybereye-test' });
+  assert.equal(buildCandidateForPrivilegeEvent(earlierPriv, [laterLogin]), null);
+
+  // Case 2: Same timestamp but login record ID strictly greater than privilege record ID
+  const ts = at(-30);
+  const privEvent = {
+    '@timestamp': ts,
+    'event.type': 'privilege_assigned',
+    'log.source': 'windows',
+    'user.name': 'cybereye-test',
+    'winlog.record_id': 100,
+  };
+  const invertedLogin = {
+    '@timestamp': ts,
+    'event.type': 'auth_success',
+    'log.source': 'windows',
+    'user.name': 'cybereye-test',
+    'winlog.record_id': 105,
+  };
+  assert.equal(buildCandidateForPrivilegeEvent(privEvent, [invertedLogin]), null);
+});
+
+test('R5 rejects correlation beyond the five-minute correlation window', () => {
+  // Login occurred 6 minutes (370 seconds) before privilege assignment
+  const oldLogin = windowsEvent('auth_success', -370, { user: 'cybereye-test' });
+  const recentPriv = windowsEvent('privilege_assigned', -10, { user: 'cybereye-test' });
+
+  assert.equal(buildCandidateForPrivilegeEvent(recentPriv, [oldLogin]), null);
+});
+
 test('R3 fires at ten distinct ports and does not fire at nine', () => {
   const bucket = (portCount) => ({
     key: '203.0.113.77',
