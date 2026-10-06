@@ -67,10 +67,12 @@ export function buildCandidatesFromEvents(events, referenceTime = Date.now()) {
 
   for (const event of events) {
     const timestamp = new Date(event['@timestamp']).getTime();
-    const sourceIp = event['source.ip'];
+    const sourceIp = event['source.ip'] || event.source?.ip;
+    const eventType = event['event.type'] || event.event?.type;
+    const logSource = event['log.source'] || event.log?.source;
     if (
-      event['event.type'] !== 'auth_failure' ||
-      event['log.source'] !== 'windows' ||
+      eventType !== 'auth_failure' ||
+      logSource !== 'windows' ||
       !sourceIp ||
       !Number.isFinite(timestamp) ||
       timestamp < windowStart ||
@@ -91,11 +93,13 @@ export function buildCandidatesFromEvents(events, referenceTime = Date.now()) {
         const newestFirst = [...groupedEvents].sort(
           (a, b) => new Date(b['@timestamp']) - new Date(a['@timestamp'])
         );
+        const hostName = groupedEvents[0]['host.name'] || groupedEvents[0].host?.name;
+        const userName = groupedEvents[0]['user.name'] || groupedEvents[0].user?.name;
         return {
           key: sourceIp,
           doc_count: groupedEvents.length,
-          affected_host: { buckets: groupedEvents[0]['host.name'] ? [{ key: groupedEvents[0]['host.name'] }] : [] },
-          affected_user: { buckets: groupedEvents[0]['user.name'] ? [{ key: groupedEvents[0]['user.name'] }] : [] },
+          affected_host: { buckets: hostName ? [{ key: hostName }] : [] },
+          affected_user: { buckets: userName ? [{ key: userName }] : [] },
           top_evidence: { hits: { hits: newestFirst.slice(0, 5).map((_source) => ({ _source })) } },
           last_failure: { value_as_string: newestFirst[0]['@timestamp'] },
         };
@@ -110,11 +114,13 @@ export function buildRollingBurstCandidates(events) {
   const bySourceIp = new Map();
 
   for (const event of events) {
-    const sourceIp = event['source.ip'];
+    const sourceIp = event['source.ip'] || event.source?.ip;
+    const eventType = event['event.type'] || event.event?.type;
+    const logSource = event['log.source'] || event.log?.source;
     const timestamp = new Date(event['@timestamp']).getTime();
     if (
-      event['event.type'] !== 'auth_failure' ||
-      event['log.source'] !== 'windows' ||
+      eventType !== 'auth_failure' ||
+      logSource !== 'windows' ||
       !sourceIp ||
       !Number.isFinite(timestamp)
     ) {
@@ -144,13 +150,15 @@ export function buildRollingBurstCandidates(events) {
       if (burstEvents.length < THRESHOLD) continue;
 
       const newestFirst = [...burstEvents].reverse();
+      const hostName = ordered[endIndex]['host.name'] || ordered[endIndex].host?.name;
+      const userName = ordered[endIndex]['user.name'] || ordered[endIndex].user?.name;
       candidates.push({
         rule_id: RULE_ID,
         rule_name: RULE_NAME,
         severity: SEVERITY,
         source_ip: sourceIp,
-        affected_host: ordered[endIndex]['host.name'] ?? null,
-        affected_user: ordered[endIndex]['user.name'] ?? null,
+        affected_host: hostName ?? null,
+        affected_user: userName ?? null,
         evidence: newestFirst.slice(0, 5),
         fail_count: burstEvents.length,
         last_failure_at: ordered[endIndex]['@timestamp'],

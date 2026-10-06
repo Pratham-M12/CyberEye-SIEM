@@ -50,6 +50,14 @@ const windowsPipeline = {
     },
     {
       set: {
+        field: 'user.name',
+        value: '{{winlog.event_data.SubjectUserName}}',
+        ignore_empty_value: true,
+        if: 'ctx.user == null || ctx.user.name == null || ctx.user.name == "" || ctx.user.name == "-"',
+      },
+    },
+    {
+      set: {
         field: 'source.ip',
         value: '{{winlog.event_data.IpAddress}}',
         ignore_empty_value: true,

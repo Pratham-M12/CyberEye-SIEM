@@ -180,6 +180,14 @@ test('siem-windows-normalize preserves Windows Event ID mapping', skipOpt, async
       },
       message: 'An account was successfully logged on: jsmith',
     },
+    {
+      winlog: {
+        event_id: '4672',
+        computer_name: 'WIN-DC01',
+        event_data: { SubjectUserName: 'jsmith' },
+      },
+      message: 'Special privileges assigned to new logon: jsmith',
+    },
   ];
 
   const results = await simulate('siem-windows-normalize', docs);
@@ -193,6 +201,12 @@ test('siem-windows-normalize preserves Windows Event ID mapping', skipOpt, async
 
   assert.equal(results[1].event?.type, 'auth_success');
   assert.equal(results[1].event?.severity, 'low');
+
+  assert.equal(results[2].log?.source, 'windows');
+  assert.equal(results[2].event?.type, 'privilege_assigned');
+  assert.equal(results[2].event?.severity, 'high');
+  assert.equal(results[2].user?.name, 'jsmith');
+  assert.equal(results[2].host?.name, 'WIN-DC01');
 });
 
 test('siem-windows-normalize handles valid IP and ignores "-" IpAddress', skipOpt, async () => {

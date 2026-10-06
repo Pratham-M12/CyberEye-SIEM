@@ -79,16 +79,19 @@ export async function run() {
 
 export function buildCandidateForPrivilegeEvent(privilegeEvent, loginEvents) {
   const privilegeAtMs = new Date(privilegeEvent['@timestamp']).getTime();
-  const user = privilegeEvent['user.name'];
+  const user = privilegeEvent['user.name'] || privilegeEvent.user?.name;
   if (!Number.isFinite(privilegeAtMs) || !user) return null;
 
   const login = loginEvents
     .filter((event) => {
       const loginAtMs = new Date(event['@timestamp']).getTime();
+      const eventType = event['event.type'] || event.event?.type;
+      const logSource = event['log.source'] || event.log?.source;
+      const eventUser = event['user.name'] || event.user?.name;
       return (
-        event['event.type'] === 'auth_success' &&
-        event['log.source'] === 'windows' &&
-        event['user.name'] === user &&
+        eventType === 'auth_success' &&
+        logSource === 'windows' &&
+        eventUser === user &&
         Number.isFinite(loginAtMs) &&
         loginAtMs < privilegeAtMs &&
         privilegeAtMs - loginAtMs <= 5 * 60 * 1000
@@ -98,12 +101,15 @@ export function buildCandidateForPrivilegeEvent(privilegeEvent, loginEvents) {
 
   if (!login) return null;
 
+  const sourceIp = login['source.ip'] || login.source?.ip || null;
+  const affectedHost = privilegeEvent['host.name'] || privilegeEvent.host?.name || null;
+
   return {
     rule_id: RULE_ID,
     rule_name: RULE_NAME,
     severity: SEVERITY,
-    source_ip: login['source.ip'] ?? null,
-    affected_host: privilegeEvent['host.name'] ?? null,
+    source_ip: sourceIp,
+    affected_host: affectedHost,
     affected_user: user,
     evidence: [login, privilegeEvent],
   };

@@ -83,16 +83,22 @@ export function buildCandidatesForBurst(bruteForceHit, successEvents) {
 
   const lastFailureMs = new Date(lastFailureAt).getTime();
   const success = successEvents
-    .filter(
-      (event) =>
-        event['event.type'] === 'auth_success' &&
-        event['log.source'] === 'windows' &&
-        event['source.ip'] === bruteForceHit.source_ip &&
+    .filter((event) => {
+      const eventType = event['event.type'] || event.event?.type;
+      const logSource = event['log.source'] || event.log?.source;
+      const sourceIp = event['source.ip'] || event.source?.ip;
+      return (
+        eventType === 'auth_success' &&
+        logSource === 'windows' &&
+        sourceIp === bruteForceHit.source_ip &&
         isAfterWithinWindow(event['@timestamp'], lastFailureMs, SUCCESS_WINDOW_MS)
-    )
+      );
+    })
     .sort((a, b) => new Date(a['@timestamp']) - new Date(b['@timestamp']))[0];
 
   if (!success) return [];
+
+  const successUser = (success['user.name'] || success.user?.name) ?? bruteForceHit.affected_user;
 
   return [{
     rule_id: RULE_ID,
@@ -100,7 +106,7 @@ export function buildCandidatesForBurst(bruteForceHit, successEvents) {
     severity: SEVERITY,
     source_ip: bruteForceHit.source_ip,
     affected_host: bruteForceHit.affected_host,
-    affected_user: success['user.name'] ?? bruteForceHit.affected_user,
+    affected_user: successUser,
     evidence: [...(bruteForceHit.evidence ?? []), success],
     fail_count: bruteForceHit.fail_count,
   }];
