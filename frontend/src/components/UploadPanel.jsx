@@ -122,7 +122,15 @@ export default function UploadPanel() {
       ]);
     } catch (uploadError) {
       setProgress({ percent: 0, stage: 'idle' });
-      setError(uploadError.response?.data?.error || uploadError.message || 'Upload failed.');
+      const rawMsg = uploadError.response?.data?.error || uploadError.message;
+      const sanitized =
+        typeof rawMsg === 'string' &&
+        !rawMsg.includes('stack') &&
+        !rawMsg.includes('at ') &&
+        !rawMsg.includes('SyntaxError')
+          ? rawMsg
+          : 'Unable to process and index log file. Please check file format and encoding.';
+      setError(sanitized);
     } finally {
       setIsUploading(false);
     }
@@ -142,30 +150,40 @@ export default function UploadPanel() {
           }
       />
 
-      <div className="grid gap-6 p-6 lg:grid-cols-[250px_1fr]">
-        <div className="rounded-lg border border-hairline bg-raised p-5">
+      <div className="grid gap-4 sm:gap-6 p-4 sm:p-6 lg:grid-cols-[250px_1fr]">
+        <div className="rounded-lg border border-hairline bg-raised p-4 sm:p-5">
           <label className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
             Parser
           </label>
-          <select
-            value={sourceType}
-            onChange={(event) => handleSourceTypeChange(event.target.value)}
-            disabled={isLoading}
-            className="mt-2 w-full rounded-lg border border-hairline bg-raised px-4 py-3 text-sm text-white transition focus:border-accent focus:outline-none"
-          >
-            {supportedTypes.map((type) => (
-              <option key={type.id} value={type.id}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-          <p className="mt-2 text-xs text-ink-muted">
-            {selectedType?.description || 'Loading parser configuration...'}
-          </p>
-          {selectedType && (
-            <p className="mt-2 font-mono text-[11px] text-ink-dim">
-              accepts: {selectedType.extensions.join(', ')}
-            </p>
+          {isLoading ? (
+            <div className="mt-2 space-y-2 animate-pulse">
+              <div className="h-11 w-full rounded-lg bg-hairline/40" />
+              <div className="h-3 w-3/4 rounded bg-hairline/25" />
+            </div>
+          ) : (
+            <>
+              <select
+                value={sourceType}
+                onChange={(event) => handleSourceTypeChange(event.target.value)}
+                disabled={isUploading}
+                aria-label="Select parser type"
+                className="mt-2 w-full rounded-lg border border-hairline bg-raised px-4 py-3 text-sm text-white transition focus:border-accent focus:outline-none"
+              >
+                {supportedTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-ink-muted">
+                {selectedType?.description || 'Parser configuration ready.'}
+              </p>
+              {selectedType && (
+                <p className="mt-2 font-mono text-[11px] text-ink-dim">
+                  accepts: {selectedType.extensions.join(', ')}
+                </p>
+              )}
+            </>
           )}
         </div>
 
@@ -239,24 +257,52 @@ export default function UploadPanel() {
           </label>
 
           {error && (
-            <div className="mt-3 rounded-md border border-severity-critical/30 bg-severity-critical/10 px-3 py-2 text-sm text-severity-critical">
-              {error}
+            <div
+              role="alert"
+              aria-live="polite"
+              className="mt-3 flex items-start gap-2.5 rounded-lg border border-severity-critical/30 bg-severity-critical/10 px-4 py-3 text-sm text-severity-critical"
+            >
+              <span className="shrink-0 text-base">⚠️</span>
+              <div className="flex-1 font-medium">{error}</div>
             </div>
           )}
 
           {result && (
-            <div className="mt-3 rounded-md border border-accent/30 bg-accent/10 px-3 py-3 text-sm text-ink-primary">
-              <p>
-                Indexed {result.indexedCount} event(s) from <span className="font-mono">{result.fileName}</span>
-                {result.alertsTriggered ? ` and fired ${result.alertsTriggered} alert(s).` : '.'}
-              </p>
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-950/20 p-4 text-sm text-emerald-300"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold">
+                  <span>✓</span>
+                  <span>
+                    Successfully indexed {result.indexedCount} event(s) from{' '}
+                    <span className="font-mono text-white">{result.fileName}</span>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResult(null)}
+                  className="text-xs text-emerald-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              {result.alertsTriggered > 0 && (
+                <p className="mt-1.5 font-mono text-xs text-orange-300">
+                  ⚡ Generated {result.alertsTriggered} new detection alert(s). Check the Alert Queue!
+                </p>
+              )}
               {result.skippedCount > 0 && (
-                <p className="mt-1 text-xs text-ink-muted">Skipped {result.skippedCount} unrecognized record(s).</p>
+                <p className="mt-1 text-xs text-emerald-400/80">
+                  Skipped {result.skippedCount} unrecognized record(s).
+                </p>
               )}
               {result.warnings?.length > 0 && (
-                <ul className="mt-2 space-y-1 text-xs text-ink-muted">
-                  {result.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
+                <ul className="mt-2 space-y-1 text-xs text-emerald-400/70 border-t border-emerald-800/40 pt-2">
+                  {result.warnings.map((warning, i) => (
+                    <li key={i}>• {warning}</li>
                   ))}
                 </ul>
               )}
@@ -266,7 +312,7 @@ export default function UploadPanel() {
           {(isUploading || progress.stage === 'done') && (
             <div className="mt-5 rounded-lg border border-hairline bg-raised p-4">
               <div className="mb-1 flex items-center justify-between font-mono text-[11px] text-ink-muted">
-                <span>{progressLabel(progress.stage)}</span>
+                <span className="capitalize">{progressLabel(progress.stage)}</span>
                 <span>{progress.percent}%</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-void">
@@ -282,9 +328,17 @@ export default function UploadPanel() {
             <button
               onClick={handleUpload}
               disabled={!canUpload || isUploading || isLoading || !file || Boolean(error)}
-              className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-white transition hover:scale-105 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Upload and index log file"
+              className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-semibold text-white transition hover:scale-105 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
             >
-              {isUploading ? 'uploading...' : 'upload and index'}
+              {isUploading ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <span>Upload and Index</span>
+              )}
             </button>
             <button
               onClick={() => {
@@ -293,10 +347,11 @@ export default function UploadPanel() {
                 setResult(null);
                 setProgress({ percent: 0, stage: 'idle' });
               }}
-              disabled={isUploading && !file}
-              className="rounded-lg border border-hairline bg-raised px-5 py-2.5 text-sm font-medium text-white transition hover:border-accent hover:bg-accent/10"
+              disabled={isUploading}
+              aria-label="Clear selected file"
+              className="rounded-lg border border-hairline bg-raised px-5 py-2.5 text-sm font-medium text-white transition hover:border-accent hover:bg-accent/10 disabled:opacity-30"
             >
-              clear
+              Clear
             </button>
           </div>
         </div>

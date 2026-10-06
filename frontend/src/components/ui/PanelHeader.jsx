@@ -5,23 +5,23 @@ export default function PanelHeader({
   right,
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-hairline bg-raised px-5 py-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-lg font-bold text-white shadow">
+    <div className="flex items-center justify-between gap-3 border-b border-hairline bg-raised px-4 sm:px-5 py-3 sm:py-4">
+      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+        <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-accent text-base sm:text-lg font-bold text-white shadow">
           {icon}
         </div>
-        <div>
-          <h2 className="font-mono text-base font-semibold tracking-wide text-white">
+        <div className="min-w-0">
+          <h2 className="font-mono text-sm sm:text-base font-semibold tracking-wide text-white truncate">
             {title}
           </h2>
           {subtitle && (
-            <p className="mt-0.5 text-xs text-ink-muted">
+            <p className="mt-0.5 text-xs text-ink-muted truncate">
               {subtitle}
             </p>
           )}
         </div>
       </div>
-      {right}
+      {right && <div className="shrink-0">{right}</div>}
     </div>
   );
 }

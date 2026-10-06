@@ -1,13 +1,20 @@
 // frontend/src/components/LogExplorer.jsx
-
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
 import { getLogs } from '../api/siem.js';
+import { getTimeRange } from '../constants/timeRange.js';
 import SeverityBadge from './SeverityBadge.jsx';
-import Panel from "./ui/Panel";
-import PanelHeader from "./ui/PanelHeader";
-import StatusDot from "./ui/StatusDot";
+import Panel from './ui/Panel';
+import PanelHeader from './ui/PanelHeader';
+import StatusDot from './ui/StatusDot';
+import LoadingSkeleton from './ui/LoadingSkeleton';
+import EmptyState from './ui/EmptyState';
+import ErrorState from './ui/ErrorState';
 
 const SOURCES = ['windows', 'snort', 'nginx', 'apache', 'syslog'];
 const SEVERITIES = ['low', 'medium', 'high', 'critical'];
@@ -27,77 +34,101 @@ const columns = [
   {
     header: 'Time',
     id: '@timestamp',
-    accessorFn: row => row['@timestamp'],
+    accessorFn: (row) => row['@timestamp'],
     cell: (info) => (
-      <span className="tabular font-mono text-xs text-ink-muted">{formatTime(info.getValue())}</span>
+      <span className="tabular font-mono text-xs text-ink-muted">
+        {formatTime(info.getValue())}
+      </span>
     ),
   },
   {
     id: 'severity',
     header: 'Severity',
-    accessorFn: row => row['event.severity'],
-    cell: (info) => {
-      console.log("Severity value:", info.getValue());
-      return <SeverityBadge severity={info.getValue()} />;
-    },
+    accessorFn: (row) => row['event.severity'],
+    cell: (info) => <SeverityBadge severity={info.getValue()} />,
   },
   {
     id: 'source',
     header: 'Source',
-    accessorFn: row => row['log.source'],
+    accessorFn: (row) => row['log.source'],
     cell: (info) => (
-      <span className="font-mono text-xs uppercase text-ink-muted">{info.getValue()}</span>
+      <span className="font-mono text-xs uppercase text-ink-muted">
+        {info.getValue() || '—'}
+      </span>
     ),
   },
   {
     id: 'eventType',
     header: 'Event type',
-    accessorFn: row => row['event.type'],
-    cell: (info) => <span className="font-mono text-xs text-ink-primary">{info.getValue()}</span>,
+    accessorFn: (row) => row['event.type'],
+    cell: (info) => (
+      <span className="font-mono text-xs text-ink-primary">
+        {info.getValue() || '—'}
+      </span>
+    ),
   },
   {
     id: 'sourceIp',
     header: 'Source IP',
-    accessorFn: row => row['source.ip'],
-    cell: (info) => <span className="font-mono text-xs text-ink-primary">{info.getValue() ?? '—'}</span>,
+    accessorFn: (row) => row['source.ip'],
+    cell: (info) => (
+      <span className="font-mono text-xs text-ink-primary">
+        {info.getValue() ?? '—'}
+      </span>
+    ),
   },
   {
     id: 'host',
     header: 'Host',
-    accessorFn: row => row['host.name'],
-    cell: (info) => <span className="font-mono text-xs text-ink-muted">{info.getValue() ?? '—'}</span>,
+    accessorFn: (row) => row['host.name'],
+    cell: (info) => (
+      <span className="font-mono text-xs text-ink-muted">
+        {info.getValue() ?? '—'}
+      </span>
+    ),
   },
   {
     id: 'user',
     header: 'User',
-    accessorFn: row => row['user.name'],
-    cell: (info) => <span className="font-mono text-xs text-ink-muted">{info.getValue() ?? '—'}</span>,
+    accessorFn: (row) => row['user.name'],
+    cell: (info) => (
+      <span className="font-mono text-xs text-ink-muted">
+        {info.getValue() ?? '—'}
+      </span>
+    ),
   },
 ];
 
-export default function LogExplorer({ ipFilter, onClearIpFilter }) {
+export default function LogExplorer({
+  ipFilter,
+  onClearIpFilter,
+  timeRange = '24h',
+  autoRefresh = true,
+}) {
+  const activeRange = getTimeRange(timeRange);
   const [source, setSource] = useState('');
   const [severity, setSeverity] = useState('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['logs', { source, severity, q, ipFilter, page }],
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: ['logs', { source, severity, q, ipFilter, page, timeRange }],
     queryFn: () =>
       getLogs({
         source: source || undefined,
         severity: severity || undefined,
         source_ip: ipFilter || undefined,
+        from: new Date(Date.now() - activeRange.ms).toISOString(),
         q: q || undefined,
         page,
         pageSize,
       }),
-    refetchInterval: 30_000,
+    refetchInterval: autoRefresh ? 30_000 : false,
+    placeholderData: (prev) => prev,
   });
 
   const logs = data?.logs ?? [];
-  console.log("FIRST LOG:", logs[0]);
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -112,99 +143,115 @@ export default function LogExplorer({ ipFilter, onClearIpFilter }) {
     [source, severity, q, ipFilter]
   );
 
+  function handleClearFilters() {
+    setSource('');
+    setSeverity('');
+    setQ('');
+    setPage(1);
+    onClearIpFilter?.();
+  }
+
   return (
     <Panel className="flex flex-col">
       <PanelHeader
-          icon="📜"
-          title="Log Explorer"
-          subtitle="Search and investigate ingested events"
-          right={
-              <StatusDot
-                  color="bg-green-500"
-                  text={`${total.toLocaleString()} Events`}
-              />
-          }
+        icon="📜"
+        title="Log Explorer"
+        subtitle={`Search and investigate ingested events (${activeRange.fullLabel})`}
+        right={
+          <div className="flex items-center gap-3">
+            {isFetching && !isLoading && (
+              <span
+                className="flex items-center gap-1.5 text-[11px] text-ink-muted"
+                title="Updating logs..."
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                <span>Syncing</span>
+              </span>
+            )}
+            <StatusDot
+              color={total > 0 ? 'bg-green-500' : 'bg-ink-dim'}
+              text={`${total.toLocaleString()} Events`}
+            />
+          </div>
+        }
       />
 
-      <div className="grid gap-4 border-b border-hairline bg-raised p-5 lg:grid-cols-[1fr_180px_180px_auto]">
+      {/* Filter and Search Bar */}
+      <div className="grid gap-3 sm:gap-4 border-b border-hairline bg-raised p-4 sm:p-5 lg:grid-cols-[1fr_180px_180px_auto]">
+        <input
+          value={q}
+          onChange={(e) => {
+            setPage(1);
+            setQ(e.target.value);
+          }}
+          placeholder="🔍 Search logs..."
+          aria-label="Search logs"
+          className="rounded-xl border border-hairline bg-panel px-4 py-3 text-sm text-white placeholder:text-ink-muted focus:border-accent focus:outline-none"
+        />
 
-          <input
-              value={q}
-              onChange={(e)=>{
-                  setPage(1);
-                  setQ(e.target.value);
-              }}
-              placeholder="🔍 Search logs..."
-              className="rounded-xl border border-hairline bg-panel px-4 py-3 text-sm text-white placeholder:text-ink-muted focus:border-accent focus:outline-none"
-          />
+        <select
+          value={source}
+          onChange={(e) => {
+            setPage(1);
+            setSource(e.target.value);
+          }}
+          aria-label="Filter by source"
+          className="rounded-xl border border-hairline bg-panel px-4 py-3 text-sm text-white focus:border-accent"
+        >
+          <option value="">All Sources</option>
+          {SOURCES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
 
-          <select
-              value={source}
-              onChange={(e)=>{
-                  setPage(1);
-                  setSource(e.target.value);
-              }}
-              className="rounded-xl border border-hairline bg-panel px-4 py-3 text-sm text-white focus:border-accent"
-          >
-              <option value="">All Sources</option>
+        <select
+          value={severity}
+          onChange={(e) => {
+            setPage(1);
+            setSeverity(e.target.value);
+          }}
+          aria-label="Filter by severity"
+          className="rounded-xl border border-hairline bg-panel px-4 py-3 text-sm text-white focus:border-accent"
+        >
+          <option value="">All Severities</option>
+          {SEVERITIES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
 
-              {SOURCES.map((s)=>(
-                  <option key={s} value={s}>
-                      {s}
-                  </option>
-              ))}
-
-          </select>
-
-          <select
-              value={severity}
-              onChange={(e)=>{
-                  setPage(1);
-                  setSeverity(e.target.value);
-              }}
-              className="rounded-xl border border-hairline bg-panel px-4 py-3 text-sm text-white focus:border-accent"
-          >
-              <option value="">All Severities</option>
-
-              {SEVERITIES.map((s)=>(
-                  <option key={s} value={s}>
-                      {s}
-                  </option>
-              ))}
-
-          </select>
-
-          <button
-              onClick={()=>{
-                  setSource("");
-                  setSeverity("");
-                  setQ("");
-                  setPage(1);
-                  onClearIpFilter?.();
-              }}
-              className="rounded-xl border border-hairline bg-panel px-5 py-3 text-white transition hover:border-accent"
-          >
-              Clear
-          </button>
-
+        <button
+          onClick={handleClearFilters}
+          disabled={!filtersActive}
+          aria-label="Clear all log filters"
+          className="rounded-xl border border-hairline bg-panel px-5 py-3 text-white transition hover:border-accent disabled:opacity-40"
+        >
+          Clear
+        </button>
       </div>
 
+      {/* Active IP Filter Pill */}
       {ipFilter && (
-      <div className="px-5 pt-4">
-        <span className="inline-flex items-center gap-2 rounded-full bg-orange-500/10 px-4 py-2 text-sm text-orange-400">
-          🟧 {ipFilter}
+        <div className="px-5 pt-4">
+          <span className="inline-flex items-center gap-2 rounded-full bg-orange-500/10 px-4 py-2 text-sm text-orange-400">
+            <span>🟧</span>
+            <span className="font-mono">{ipFilter}</span>
+            <button
+              onClick={onClearIpFilter}
+              aria-label="Remove IP filter"
+              className="font-bold transition hover:text-white"
+            >
+              ×
+            </button>
+          </span>
+        </div>
+      )}
 
-          <button
-            onClick={onClearIpFilter}
-            className="font-bold transition hover:text-white"
-          >
-            ×
-          </button>
-        </span>
-      </div>
-    )}
-
-      <div className="overflow-auto rounded-lg">
+      {/* Table Content */}
+      <div className="overflow-x-auto rounded-lg">
         <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10 bg-raised">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -214,48 +261,81 @@ export default function LogExplorer({ ipFilter, onClearIpFilter }) {
                     key={header.id}
                     className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-widest text-ink-muted"
                   >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
+                    {flexRender(
+                      header.column.columnDef.header,
+                      header.getContext()
+                    )}
                   </th>
                 ))}
               </tr>
             ))}
           </thead>
           <tbody>
-            {isLoading && (
+            {/* Initial Loading Skeleton (only on initial load before any data arrives) */}
+            {isLoading && logs.length === 0 && (
+              <LoadingSkeleton variant="table" count={6} />
+            )}
+
+            {/* API Error State (when no existing logs cached) */}
+            {!isLoading && isError && logs.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="px-5 py-12 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-500 border-t-transparent" />
-                    <p className="text-sm text-ink-muted">
-                      Loading events...
-                    </p>
-                  </div>
+                  <ErrorState
+                    title="Unable to load log events"
+                    message="The SIEM API is temporarily unavailable."
+                    onRetry={() => refetch()}
+                  />
                 </td>
               </tr>
             )}
 
-            {!isLoading && logs.length === 0 && (
+            {/* Empty State: Filters returned no results */}
+            {!isLoading && !isError && logs.length === 0 && filtersActive && (
               <tr>
-                <td colSpan={columns.length} className="px-5 py-14 text-center">
-                  <div className="flex flex-col items-center">
-                    <div className="mb-3 text-5xl">📭</div>
-                    <h3 className="text-lg font-semibold text-white">
-                      No matching events
-                    </h3>
-                    <p className="mt-2 text-sm text-ink-muted">
-                      Try changing your filters or search query.
-                    </p>
-                  </div>
+                <td colSpan={columns.length} className="px-5 py-12 text-center">
+                  <EmptyState
+                    icon="🔍"
+                    title="No logs match your filters"
+                    description="No events found matching your search query, source, or severity filters."
+                    action={
+                      <button
+                        onClick={handleClearFilters}
+                        className="rounded-lg border border-hairline bg-panel px-4 py-2 font-mono text-xs text-accent hover:border-accent"
+                      >
+                        Reset All Filters
+                      </button>
+                    }
+                  />
                 </td>
               </tr>
             )}
 
-            {!isLoading &&
+            {/* Empty State: SIEM completely empty for active time window */}
+            {!isLoading && !isError && logs.length === 0 && !filtersActive && (
+              <tr>
+                <td colSpan={columns.length} className="px-5 py-12 text-center">
+                  <EmptyState
+                    icon="📜"
+                    title="No logs indexed in this window"
+                    description={`No events recorded in the ${activeRange.fullLabel.toLowerCase()}. Upload files or configure a Beat shipper to start streaming.`}
+                  />
+                </td>
+              </tr>
+            )}
+
+            {/* Render Log Rows - kept visible during background refreshes */}
+            {logs.length > 0 &&
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b border-hairline/40 odd:bg-panel even:bg-raised/40 transition hover:bg-orange-500/5">
+                <tr
+                  key={row.id}
+                  className="border-b border-hairline/40 odd:bg-panel even:bg-raised/40 transition hover:bg-orange-500/5"
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-5 py-3">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -264,26 +344,29 @@ export default function LogExplorer({ ipFilter, onClearIpFilter }) {
         </table>
       </div>
 
-      <div className="flex items-center justify-between border-t border-hairline bg-raised px-6 py-4">
-      <span className="text-sm text-ink-muted">
-      Page {page} of {totalPages}
-      </span>
-      <div className="flex gap-3">
-      <button
-      disabled={page<=1}
-      onClick={()=>setPage((p)=>Math.max(1,p-1))}
-      className="rounded-lg border border-hairline bg-panel px-5 py-2 text-white transition hover:border-accent disabled:opacity-30"
-      >
-      ◀ Previous
-      </button>
-      <button
-      disabled={page>=totalPages}
-      onClick={()=>setPage((p)=>Math.min(totalPages,p+1))}
-      className="rounded-lg border border-hairline bg-panel px-5 py-2 text-white transition hover:border-accent disabled:opacity-30"
-      >
-      Next ▶
-      </button>
-      </div>
+      {/* Pagination Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline bg-raised px-4 sm:px-6 py-3 sm:py-4">
+        <span className="text-xs sm:text-sm font-mono text-ink-muted">
+          Page {page} of {totalPages}
+        </span>
+        <div className="flex gap-2 sm:gap-3">
+          <button
+            disabled={page <= 1 || isLoading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Previous page"
+            className="rounded-lg border border-hairline bg-panel px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm text-white transition hover:border-accent disabled:opacity-30"
+          >
+            ◀ Previous
+          </button>
+          <button
+            disabled={page >= totalPages || isLoading}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            aria-label="Next page"
+            className="rounded-lg border border-hairline bg-panel px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm text-white transition hover:border-accent disabled:opacity-30"
+          >
+            Next ▶
+          </button>
+        </div>
       </div>
     </Panel>
   );

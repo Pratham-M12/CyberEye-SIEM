@@ -41,7 +41,7 @@ export default function LoginView() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-void px-4 py-12">
-      <div className="w-full max-w-md space-y-8 rounded-panel border border-hairline bg-panel p-8 shadow-2xl backdrop-blur">
+      <div className="w-full max-w-md space-y-8 rounded-panel border border-hairline bg-panel p-6 sm:p-8 shadow-2xl backdrop-blur">
         {/* CyberEye Branding Header */}
         <div className="text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-3xl font-extrabold text-white shadow-lg shadow-accent/25">

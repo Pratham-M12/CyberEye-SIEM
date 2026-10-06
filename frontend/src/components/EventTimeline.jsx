@@ -1,3 +1,5 @@
+// frontend/src/components/EventTimeline.jsx
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AreaChart,
@@ -11,9 +13,12 @@ import {
 } from 'recharts';
 
 import { getTimeline } from '../api/siem.js';
-
+import { getTimeRange } from '../constants/timeRange.js';
 import Panel from './ui/Panel';
 import PanelHeader from './ui/PanelHeader';
+import LoadingSkeleton from './ui/LoadingSkeleton';
+import EmptyState from './ui/EmptyState';
+import ErrorState from './ui/ErrorState';
 
 const SOURCE_COLORS = {
   windows: '#4FA8E0',
@@ -30,11 +35,15 @@ function formatTick(ts) {
   });
 }
 
-export default function EventTimeline() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['stats', 'timeline'],
-    queryFn: () => getTimeline({ window: '24h', interval: '1h' }),
-    refetchInterval: 30000,
+export default function EventTimeline({ timeRange = '24h', autoRefresh = true }) {
+  const activeRange = getTimeRange(timeRange);
+
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: ['stats', 'timeline', timeRange],
+    queryFn: () =>
+      getTimeline({ window: activeRange.id, interval: activeRange.interval }),
+    refetchInterval: autoRefresh ? 30_000 : false,
+    placeholderData: (prev) => prev,
   });
 
   const timeline = data?.timeline ?? [];
@@ -49,46 +58,63 @@ export default function EventTimeline() {
 
   return (
     <Panel className="flex h-full flex-col">
-
       <PanelHeader
         icon="📈"
         title="Event Timeline"
-        subtitle="Events in the last 24 hours"
+        subtitle={`Events in the ${activeRange.fullLabel.toLowerCase()}`}
+        right={
+          isFetching && !isLoading ? (
+            <span
+              className="flex items-center gap-1.5 text-[11px] text-ink-muted"
+              title="Updating timeline..."
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+              <span>Syncing</span>
+            </span>
+          ) : null
+        }
       />
 
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-3.5 sm:p-6">
+        {/* Initial loading skeleton */}
+        {isLoading && timeline.length === 0 && (
+          <LoadingSkeleton variant="chart" />
+        )}
 
-        {isLoading && (
-          <div className="text-sm text-ink-muted">
-            Loading timeline...
+        {/* API Error State */}
+        {isError && timeline.length === 0 && (
+          <ErrorState
+            title="Unable to load timeline"
+            message="The SIEM API is temporarily unavailable."
+            onRetry={() => refetch()}
+            className="h-[320px]"
+          />
+        )}
+
+        {/* Clean Empty State */}
+        {!isLoading && !isError && timeline.length === 0 && (
+          <EmptyState
+            icon="📊"
+            title="No events in this time range"
+            description={`No log activity has been recorded in the ${activeRange.fullLabel.toLowerCase()}. Telemetry from Filebeat and Winlogbeat will chart here.`}
+            className="h-[320px]"
+          />
+        )}
+
+        {/* Non-destructive background error indicator if data exists */}
+        {isError && timeline.length > 0 && (
+          <div className="mb-3">
+            <ErrorState
+              compact
+              message="Unable to refresh timeline data."
+              onRetry={() => refetch()}
+            />
           </div>
         )}
 
-        {!isLoading && timeline.length === 0 && (
-          <div className="flex h-full items-center justify-center text-center">
-
-            <div>
-
-              <div className="mb-4 text-5xl">
-                📊
-              </div>
-
-              <p className="text-ink-secondary">
-                No events indexed yet.
-              </p>
-
-              <p className="mt-2 text-sm text-ink-muted">
-                Upload logs or wait for the detection engine.
-              </p>
-
-            </div>
-
-          </div>
-        )}
-
+        {/* Chart Render */}
         {!isLoading && timeline.length > 0 && (
           <ResponsiveContainer width="100%" height={320}>
-
             <AreaChart
               data={timeline}
               margin={{
@@ -98,7 +124,6 @@ export default function EventTimeline() {
                 bottom: 5,
               }}
             >
-
               <defs>
                 {sources.map((source) => (
                   <linearGradient
@@ -114,7 +139,6 @@ export default function EventTimeline() {
                       stopColor={SOURCE_COLORS[source] ?? '#FF5A1F'}
                       stopOpacity={0.45}
                     />
-
                     <stop
                       offset="95%"
                       stopColor={SOURCE_COLORS[source] ?? '#FF5A1F'}
@@ -180,14 +204,10 @@ export default function EventTimeline() {
                   }}
                 />
               ))}
-
             </AreaChart>
-
           </ResponsiveContainer>
         )}
-
       </div>
-
     </Panel>
   );
 }

@@ -133,8 +133,13 @@ export default function UserManagementModal({ isOpen, onClose, currentUsername }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="relative w-full max-w-4xl rounded-panel border border-hairline bg-panel p-6 shadow-2xl space-y-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-label="User Management and RBAC"
+    >
+      <div className="relative w-full max-w-4xl rounded-panel border border-hairline bg-panel p-4 sm:p-6 shadow-2xl space-y-6">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-hairline pb-4">
           <div className="flex items-center gap-3">
@@ -150,6 +155,7 @@ export default function UserManagementModal({ isOpen, onClose, currentUsername }
           </div>
           <button
             onClick={onClose}
+            aria-label="Close user management dialog"
             className="rounded-lg p-2 text-ink-secondary hover:bg-raised hover:text-white transition"
           >
             ✕
