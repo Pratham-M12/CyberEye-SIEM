@@ -11,6 +11,7 @@ import StatusDot from './ui/StatusDot';
 import LoadingSkeleton from './ui/LoadingSkeleton';
 import EmptyState from './ui/EmptyState';
 import ErrorState from './ui/ErrorState';
+import { IconAlertOctagon, IconShieldCheck, IconSearch } from './ui/Icons.jsx';
 
 const SEVERITY_FILTERS = ['all', 'critical', 'high', 'medium', 'low'];
 
@@ -76,7 +77,7 @@ export default function AlertQueue({
   return (
     <Panel className="flex h-full flex-col">
       <PanelHeader
-        icon="!"
+        icon={<IconAlertOctagon className="h-5 w-5" />}
         title="Alert Queue"
         subtitle={`Realtime Detection Engine • ${activeRange.label}`}
         right={
@@ -151,7 +152,7 @@ export default function AlertQueue({
         {/* Clean Empty State (Queue completely empty) */}
         {!isLoading && !isError && alerts.length === 0 && (
           <EmptyState
-            icon="🛡️"
+            icon={<IconShieldCheck className="h-6 w-6 text-ink-muted" />}
             title="No alerts detected"
             description="The rule engine evaluates telemetry every 30 seconds. Incidents violating detection thresholds will appear here automatically."
             className="py-12"
@@ -164,7 +165,7 @@ export default function AlertQueue({
           alerts.length > 0 &&
           filteredAlerts.length === 0 && (
             <EmptyState
-              icon="🔍"
+              icon={<IconSearch className="h-6 w-6 text-ink-muted" />}
               title={`No ${severityFilter} alerts`}
               description={`No alerts matching "${severityFilter}" severity are currently open.`}
               action={

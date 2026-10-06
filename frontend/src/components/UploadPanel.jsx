@@ -6,6 +6,15 @@ import { useAuth } from '../context/AuthContext.jsx';
 import Panel from "./ui/Panel";
 import PanelHeader from "./ui/PanelHeader";
 import StatusDot from "./ui/StatusDot";
+import {
+  IconFolder,
+  IconLock,
+  IconUploadCloud,
+  IconAlertTriangle,
+  IconCheck,
+  IconClose,
+  IconZap,
+} from './ui/Icons.jsx';
 
 const FALLBACK_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const AUTO_SOURCE_BY_EXTENSION = {
@@ -139,15 +148,15 @@ export default function UploadPanel() {
   return (
     <Panel className="flex flex-col">
       <PanelHeader
-          icon="📂"
-          title="Manual Log Upload"
-          subtitle="Import logs into the SIEM engine"
-          right={
-              <StatusDot
-                  color="bg-blue-500"
-                  text={`Max ${formatBytes(maxUploadBytes)}`}
-              />
-          }
+        icon={<IconFolder className="h-5 w-5" />}
+        title="Manual Log Upload"
+        subtitle="Import logs into the SIEM engine"
+        right={
+          <StatusDot
+            color="bg-blue-500"
+            text={`Max ${formatBytes(maxUploadBytes)}`}
+          />
+        }
       />
 
       <div className="grid gap-4 sm:gap-6 p-4 sm:p-6 lg:grid-cols-[250px_1fr]">
@@ -190,7 +199,7 @@ export default function UploadPanel() {
         <div>
           {!canUpload && (
             <div className="mb-4 rounded-lg border border-yellow-600/30 bg-yellow-950/20 px-4 py-2.5 text-xs text-yellow-300 flex items-center gap-2">
-              <span>🔒</span>
+              <IconLock className="h-4 w-4 shrink-0 text-yellow-300" />
               <span>Log ingestion is restricted to Analysts and Administrators. Your current role has Read-Only permissions.</span>
             </div>
           )}
@@ -235,24 +244,24 @@ export default function UploadPanel() {
               onChange={(event) => handleFileSelection(event.target.files?.[0])}
             />
 
-            <div className="mb-4 text-6xl">
-            🗂️
+            <div className="mb-4 text-accent">
+              <IconUploadCloud className="h-16 w-16" />
             </div>
 
             <h3 className="max-w-full break-all text-center text-lg font-semibold text-white">
-            {file ? file.name : "Drag & Drop Log Files"}
+              {file ? file.name : "Drag & Drop Log Files"}
             </h3>
 
             <div className="mt-5 flex flex-wrap gap-2">
-              {supportedTypes.map(type=>(
-              <span key={type.id} className="rounded-full bg-orange-500/10 px-3 py-1 text-xs text-orange-400">
-                {type.label}
-              </span>
+              {supportedTypes.map((type) => (
+                <span key={type.id} className="rounded-full bg-orange-500/10 px-3 py-1 text-xs text-orange-400">
+                  {type.label}
+                </span>
               ))}
             </div>
 
             <p className="mt-2 text-sm text-ink-muted">
-            {file ? `${formatBytes(file.size)} selected` : "or click to browse"}
+              {file ? `${formatBytes(file.size)} selected` : "or click to browse"}
             </p>
           </label>
 
@@ -262,7 +271,7 @@ export default function UploadPanel() {
               aria-live="polite"
               className="mt-3 flex items-start gap-2.5 rounded-lg border border-severity-critical/30 bg-severity-critical/10 px-4 py-3 text-sm text-severity-critical"
             >
-              <span className="shrink-0 text-base">⚠️</span>
+              <IconAlertTriangle className="h-4 w-4 shrink-0 text-severity-critical mt-0.5" />
               <div className="flex-1 font-medium">{error}</div>
             </div>
           )}
@@ -275,7 +284,7 @@ export default function UploadPanel() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-semibold">
-                  <span>✓</span>
+                  <IconCheck className="h-4 w-4 text-emerald-400" />
                   <span>
                     Successfully indexed {result.indexedCount} event(s) from{' '}
                     <span className="font-mono text-white">{result.fileName}</span>
@@ -284,14 +293,16 @@ export default function UploadPanel() {
                 <button
                   type="button"
                   onClick={() => setResult(null)}
+                  aria-label="Dismiss upload result"
                   className="text-xs text-emerald-400 hover:text-white"
                 >
-                  ✕
+                  <IconClose className="h-3.5 w-3.5" />
                 </button>
               </div>
               {result.alertsTriggered > 0 && (
-                <p className="mt-1.5 font-mono text-xs text-orange-300">
-                  ⚡ Generated {result.alertsTriggered} new detection alert(s). Check the Alert Queue!
+                <p className="mt-1.5 font-mono text-xs text-orange-300 flex items-center gap-1.5">
+                  <IconZap className="h-3.5 w-3.5 text-accent shrink-0" />
+                  <span>Generated {result.alertsTriggered} new detection alert(s). Check the Alert Queue!</span>
                 </p>
               )}
               {result.skippedCount > 0 && (

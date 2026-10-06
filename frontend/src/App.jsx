@@ -11,6 +11,8 @@ import TopAttackers from './components/TopAttackers.jsx';
 import LogExplorer from './components/LogExplorer.jsx';
 import AlertDrawer from './components/AlertDrawer.jsx';
 import UploadPanel from './components/UploadPanel.jsx';
+import CyberEyeLogo from './components/ui/CyberEyeLogo.jsx';
+import { IconSettings } from './components/ui/Icons.jsx';
 import { DEFAULT_TIME_RANGE, getTimeRange } from './constants/timeRange.js';
 
 export default function App() {
@@ -101,20 +103,11 @@ export default function App() {
     <div className="min-h-screen bg-void">
       <header className="border-b border-hairline bg-panel shadow-panel">
         <div className="mx-auto flex max-w-[1700px] flex-wrap items-center justify-between gap-4 px-4 sm:px-8 py-3 sm:py-4">
-          {/* Logo & Platform Info */}
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-panel bg-accent text-xl font-bold text-white shadow">
-              C
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-semibold tracking-wide text-white">
-                CyberEye SIEM
-              </h1>
-              <p className="text-xs text-ink-secondary">
-                Enterprise Threat Monitoring Dashboard
-              </p>
-            </div>
-          </div>
+          {/* Professional CyberEye Logo & Platform Info */}
+          <CyberEyeLogo
+            variant="horizontal"
+            subtitle="Enterprise Threat Monitoring Dashboard"
+          />
 
           {/* Metric Cards */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
@@ -168,19 +161,24 @@ export default function App() {
             {/* Admin-only User Management Action */}
             {isAdmin && (
               <button
+                type="button"
                 onClick={() => setUserModalOpen(true)}
-                className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/20 transition"
+                className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/20 transition flex items-center gap-1.5"
                 title="Manage operator accounts and RBAC permissions"
+                aria-label="Manage operator accounts and RBAC permissions"
               >
-                ⚙ User Mgmt
+                <IconSettings className="h-3.5 w-3.5 shrink-0" />
+                <span>User Mgmt</span>
               </button>
             )}
 
             {/* Logout Action */}
             <button
+              type="button"
               onClick={() => logout()}
               className="rounded-lg border border-hairline bg-raised px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-red-950/40 hover:text-red-300 hover:border-red-700/50 transition"
               title="End active session"
+              aria-label="End active session"
             >
               Logout
             </button>

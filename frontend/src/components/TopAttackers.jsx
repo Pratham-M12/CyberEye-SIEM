@@ -20,6 +20,7 @@ import StatusDot from './ui/StatusDot';
 import LoadingSkeleton from './ui/LoadingSkeleton';
 import EmptyState from './ui/EmptyState';
 import ErrorState from './ui/ErrorState';
+import { IconTarget } from './ui/Icons.jsx';
 
 export default function TopAttackers({
   onSelectIp,
@@ -41,7 +42,7 @@ export default function TopAttackers({
   return (
     <Panel className="flex h-full flex-col">
       <PanelHeader
-        icon="🎯"
+        icon={<IconTarget className="h-5 w-5" />}
         title="Top Attackers"
         subtitle={`Most active source IPs (${activeRange.fullLabel})`}
         right={
@@ -57,6 +58,7 @@ export default function TopAttackers({
             )}
             {selectedIp ? (
               <button
+                type="button"
                 onClick={() => onSelectIp(null)}
                 aria-label="Clear selected IP filter"
                 className="rounded-md border border-accent px-3 py-1 text-xs font-medium text-accent transition hover:bg-accent hover:text-white"
@@ -92,7 +94,7 @@ export default function TopAttackers({
         {/* Clean Empty State */}
         {!isLoading && !isError && attackers.length === 0 && (
           <EmptyState
-            icon="🎯"
+            icon={<IconTarget className="h-6 w-6 text-ink-muted" />}
             title="No attackers observed"
             description={`No high-frequency offending source IPs recorded in the ${activeRange.fullLabel.toLowerCase()}.`}
             className="h-[320px]"

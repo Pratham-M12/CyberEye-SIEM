@@ -7,6 +7,21 @@ import JsonViewer from './JsonViewer.jsx';
 import AIInvestigation from './AIInvestigation.jsx';
 import LoadingSkeleton from './ui/LoadingSkeleton.jsx';
 import ErrorState from './ui/ErrorState.jsx';
+import {
+  IconGlobe,
+  IconCrosshair,
+  IconPlug,
+  IconServer,
+  IconUser,
+  IconClock,
+  IconInfo,
+  IconShield,
+  IconSparkles,
+  IconPlaybook,
+  IconClose,
+  IconChevronUp,
+  IconChevronDown,
+} from './ui/Icons.jsx';
 import { getAlert, investigateAlert, setAlertStatus } from '../api/siem.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -253,31 +268,31 @@ export default function AlertDrawer({ alertId, onClose }) {
         label: 'Source IP',
         value: sourceIp,
         mono: true,
-        icon: '🌐',
+        icon: <IconGlobe className="h-3.5 w-3.5" />,
       },
       destIp && {
         label: 'Destination IP',
         value: destIp,
         mono: true,
-        icon: '🎯',
+        icon: <IconCrosshair className="h-3.5 w-3.5" />,
       },
       destPort && {
         label: 'Destination Port',
         value: String(destPort),
         mono: true,
-        icon: '🔌',
+        icon: <IconPlug className="h-3.5 w-3.5" />,
       },
       host && {
         label: 'Target Host',
         value: host,
         mono: true,
-        icon: '💻',
+        icon: <IconServer className="h-3.5 w-3.5" />,
       },
       user && {
         label: 'Target User',
         value: user,
         mono: true,
-        icon: '👤',
+        icon: <IconUser className="h-3.5 w-3.5" />,
       },
     ].filter(Boolean);
   }, [alert]);
@@ -314,11 +329,13 @@ export default function AlertDrawer({ alertId, onClose }) {
                 Loading incident details...
               </span>
               <button
+                type="button"
                 onClick={onClose}
                 aria-label="Close drawer"
-                className="rounded-md border border-hairline px-3 py-1 font-mono text-xs text-ink-muted hover:text-ink-primary hover:border-accent transition"
+                className="rounded-md border border-hairline px-3 py-1 font-mono text-xs text-ink-muted hover:text-ink-primary hover:border-accent transition flex items-center gap-1"
               >
-                close (esc)
+                <IconClose className="h-3.5 w-3.5" />
+                <span>close (esc)</span>
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
@@ -335,11 +352,13 @@ export default function AlertDrawer({ alertId, onClose }) {
                 Incident Unavailable
               </span>
               <button
+                type="button"
                 onClick={onClose}
                 aria-label="Close drawer"
-                className="rounded-md border border-hairline px-3 py-1 font-mono text-xs text-ink-muted hover:text-ink-primary hover:border-accent transition"
+                className="rounded-md border border-hairline px-3 py-1 font-mono text-xs text-ink-muted hover:text-ink-primary hover:border-accent transition flex items-center gap-1"
               >
-                close (esc)
+                <IconClose className="h-3.5 w-3.5" />
+                <span>close (esc)</span>
               </button>
             </div>
             <div className="flex-1 flex items-center justify-center p-6">
@@ -387,7 +406,7 @@ export default function AlertDrawer({ alertId, onClose }) {
                   {/* Metadata: Timestamp & Alert ID */}
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-ink-muted">
                     <span className="flex items-center gap-1.5 tabular text-ink-secondary">
-                      <span>🕒</span>
+                      <IconClock className="h-3.5 w-3.5 text-ink-muted shrink-0" />
                       <span>{formatTime(alert['@timestamp'] || alert.createdAt)}</span>
                     </span>
 
@@ -412,24 +431,13 @@ export default function AlertDrawer({ alertId, onClose }) {
 
                 {/* Close Button */}
                 <button
+                  type="button"
                   onClick={onClose}
                   aria-label="Close alert drawer"
                   title="Close drawer (Esc)"
                   className="rounded-lg border border-hairline bg-void/50 p-2 text-ink-muted hover:text-white hover:border-accent transition shrink-0"
                 >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
+                  <IconClose className="h-4 w-4" />
                 </button>
               </div>
             </header>
@@ -628,7 +636,7 @@ export default function AlertDrawer({ alertId, onClose }) {
                 {threatIntel.status === 'private_ip' && (
                   <div className="rounded-lg border border-hairline/60 bg-void/50 p-3.5">
                     <div className="flex items-start gap-2.5">
-                      <span className="text-sm">ℹ️</span>
+                      <IconInfo className="h-4 w-4 text-sky-400 shrink-0 mt-0.5" />
                       <div>
                         <p className="font-mono text-xs text-ink-primary">
                           Internal Lab Telemetry ({threatIntel.ip})
@@ -644,7 +652,7 @@ export default function AlertDrawer({ alertId, onClose }) {
                 {threatIntel.status === 'not_enriched' && (
                   <div className="rounded-lg border border-hairline/60 bg-void/50 p-3.5">
                     <div className="flex items-start gap-2.5">
-                      <span className="text-sm text-ink-muted">🛡️</span>
+                      <IconShield className="h-4 w-4 text-ink-muted shrink-0 mt-0.5" />
                       <div>
                         <p className="font-mono text-xs text-ink-muted">
                           Enrichment Record Unavailable
@@ -672,11 +680,16 @@ export default function AlertDrawer({ alertId, onClose }) {
                         onClick={() => investigationMutation.mutate()}
                         disabled={investigationMutation.isPending}
                         aria-label="Generate AI incident investigation"
-                        className="rounded-lg border border-accent/40 bg-accent/15 px-3 py-1 font-mono text-xs font-semibold text-accent hover:bg-accent hover:text-white transition disabled:opacity-40 shadow-sm"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/15 px-3 py-1 font-mono text-xs font-semibold text-accent hover:bg-accent hover:text-white transition disabled:opacity-40 shadow-sm"
                       >
-                        {investigationMutation.isPending
-                          ? 'Investigating...'
-                          : '🔍 Investigate with AI'}
+                        {investigationMutation.isPending ? (
+                          'Investigating...'
+                        ) : (
+                          <>
+                            <IconSparkles className="h-3.5 w-3.5" />
+                            <span>Investigate with AI</span>
+                          </>
+                        )}
                       </button>
                     )}
                   {!canTriage && !alert.ai_investigation && (
@@ -733,7 +746,10 @@ export default function AlertDrawer({ alertId, onClose }) {
                 </h3>
                 <div className="rounded-lg border border-severity-high/30 bg-severity-high/5 p-3.5 text-xs text-ink-primary leading-relaxed">
                   <div className="flex items-start gap-2">
-                    <span className="text-severity-high font-bold shrink-0">🛡️ Playbook:</span>
+                    <span className="text-severity-high font-bold shrink-0 flex items-center gap-1">
+                      <IconPlaybook className="h-3.5 w-3.5" />
+                      <span>Playbook:</span>
+                    </span>
                     <span>
                       {SUGGESTED_ACTIONS[alert.rule_id] ||
                         'Review system logs and isolate the affected host if anomalous behavior persists.'}
@@ -953,9 +969,14 @@ function EvidenceEventCard({ event, index }) {
           type="button"
           onClick={() => setShowRaw((prev) => !prev)}
           aria-expanded={showRaw}
-          className="font-mono text-[11px] text-accent hover:underline flex items-center gap-1"
+          className="font-mono text-[11px] text-accent hover:underline inline-flex items-center gap-1.5"
         >
-          <span>{showRaw ? '▲ Hide raw event' : '▼ Inspect raw event JSON'}</span>
+          {showRaw ? (
+            <IconChevronUp className="h-3 w-3" />
+          ) : (
+            <IconChevronDown className="h-3 w-3" />
+          )}
+          <span>{showRaw ? 'Hide raw event' : 'Inspect raw event JSON'}</span>
         </button>
 
         {showRaw && (

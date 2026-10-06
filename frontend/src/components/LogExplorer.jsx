@@ -15,6 +15,14 @@ import StatusDot from './ui/StatusDot';
 import LoadingSkeleton from './ui/LoadingSkeleton';
 import EmptyState from './ui/EmptyState';
 import ErrorState from './ui/ErrorState';
+import {
+  IconFileText,
+  IconSearch,
+  IconFilter,
+  IconClose,
+  IconChevronLeft,
+  IconChevronRight,
+} from './ui/Icons.jsx';
 
 const SOURCES = ['windows', 'snort', 'nginx', 'apache', 'syslog'];
 const SEVERITIES = ['low', 'medium', 'high', 'critical'];
@@ -154,7 +162,7 @@ export default function LogExplorer({
   return (
     <Panel className="flex flex-col">
       <PanelHeader
-        icon="📜"
+        icon={<IconFileText className="h-5 w-5" />}
         title="Log Explorer"
         subtitle={`Search and investigate ingested events (${activeRange.fullLabel})`}
         right={
@@ -178,16 +186,21 @@ export default function LogExplorer({
 
       {/* Filter and Search Bar */}
       <div className="grid gap-3 sm:gap-4 border-b border-hairline bg-raised p-4 sm:p-5 lg:grid-cols-[1fr_180px_180px_auto]">
-        <input
-          value={q}
-          onChange={(e) => {
-            setPage(1);
-            setQ(e.target.value);
-          }}
-          placeholder="🔍 Search logs..."
-          aria-label="Search logs"
-          className="rounded-xl border border-hairline bg-panel px-4 py-3 text-sm text-white placeholder:text-ink-muted focus:border-accent focus:outline-none"
-        />
+        <div className="relative">
+          <input
+            value={q}
+            onChange={(e) => {
+              setPage(1);
+              setQ(e.target.value);
+            }}
+            placeholder="Search logs (e.g. 4625, root, admin)..."
+            aria-label="Search logs"
+            className="w-full rounded-xl border border-hairline bg-panel pl-10 pr-4 py-3 text-sm text-white placeholder:text-ink-muted focus:border-accent focus:outline-none"
+          />
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-ink-muted">
+            <IconSearch className="h-4 w-4" />
+          </div>
+        </div>
 
         <select
           value={source}
@@ -237,14 +250,14 @@ export default function LogExplorer({
       {ipFilter && (
         <div className="px-5 pt-4">
           <span className="inline-flex items-center gap-2 rounded-full bg-orange-500/10 px-4 py-2 text-sm text-orange-400">
-            <span>🟧</span>
+            <IconFilter className="h-3.5 w-3.5 shrink-0" />
             <span className="font-mono">{ipFilter}</span>
             <button
               onClick={onClearIpFilter}
               aria-label="Remove IP filter"
-              className="font-bold transition hover:text-white"
+              className="font-bold transition hover:text-white p-0.5"
             >
-              ×
+              <IconClose className="h-3 w-3" />
             </button>
           </span>
         </div>
@@ -271,12 +284,12 @@ export default function LogExplorer({
             ))}
           </thead>
           <tbody>
-            {/* Initial Loading Skeleton (only on initial load before any data arrives) */}
+            {/* Initial Loading Skeleton */}
             {isLoading && logs.length === 0 && (
               <LoadingSkeleton variant="table" count={6} />
             )}
 
-            {/* API Error State (when no existing logs cached) */}
+            {/* API Error State */}
             {!isLoading && isError && logs.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="px-5 py-12 text-center">
@@ -294,7 +307,7 @@ export default function LogExplorer({
               <tr>
                 <td colSpan={columns.length} className="px-5 py-12 text-center">
                   <EmptyState
-                    icon="🔍"
+                    icon={<IconSearch className="h-6 w-6 text-ink-muted" />}
                     title="No logs match your filters"
                     description="No events found matching your search query, source, or severity filters."
                     action={
@@ -315,7 +328,7 @@ export default function LogExplorer({
               <tr>
                 <td colSpan={columns.length} className="px-5 py-12 text-center">
                   <EmptyState
-                    icon="📜"
+                    icon={<IconFileText className="h-6 w-6 text-ink-muted" />}
                     title="No logs indexed in this window"
                     description={`No events recorded in the ${activeRange.fullLabel.toLowerCase()}. Upload files or configure a Beat shipper to start streaming.`}
                   />
@@ -323,7 +336,7 @@ export default function LogExplorer({
               </tr>
             )}
 
-            {/* Render Log Rows - kept visible during background refreshes */}
+            {/* Render Log Rows */}
             {logs.length > 0 &&
               table.getRowModel().rows.map((row) => (
                 <tr
@@ -354,17 +367,19 @@ export default function LogExplorer({
             disabled={page <= 1 || isLoading}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             aria-label="Previous page"
-            className="rounded-lg border border-hairline bg-panel px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm text-white transition hover:border-accent disabled:opacity-30"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-panel px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm text-white transition hover:border-accent disabled:opacity-30"
           >
-            ◀ Previous
+            <IconChevronLeft className="h-3.5 w-3.5 shrink-0" />
+            <span>Previous</span>
           </button>
           <button
             disabled={page >= totalPages || isLoading}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             aria-label="Next page"
-            className="rounded-lg border border-hairline bg-panel px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm text-white transition hover:border-accent disabled:opacity-30"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-panel px-3.5 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm text-white transition hover:border-accent disabled:opacity-30"
           >
-            Next ▶
+            <span>Next</span>
+            <IconChevronRight className="h-3.5 w-3.5 shrink-0" />
           </button>
         </div>
       </div>

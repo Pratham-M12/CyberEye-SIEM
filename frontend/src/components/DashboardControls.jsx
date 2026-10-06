@@ -1,6 +1,7 @@
 // frontend/src/components/DashboardControls.jsx
 import React from 'react';
 import { TIME_RANGES } from '../constants/timeRange.js';
+import { IconAlertTriangle, IconClose } from './ui/Icons.jsx';
 
 /**
  * Enterprise SIEM Global Dashboard Controls Component.
@@ -78,7 +79,7 @@ export default function DashboardControls({
               role="alert"
               className="flex items-center gap-2 rounded-lg border border-severity-high/40 bg-severity-high/10 px-2.5 py-1 text-xs text-severity-high"
             >
-              <span className="text-xs">⚠️</span>
+              <IconAlertTriangle className="h-3.5 w-3.5 shrink-0" />
               <span className="font-medium text-[11px] hidden sm:inline">
                 Sync failed. Showing cached data.
               </span>
@@ -92,7 +93,7 @@ export default function DashboardControls({
                   aria-label="Dismiss error notification"
                   className="ml-1 text-severity-high hover:text-white transition"
                 >
-                  ✕
+                  <IconClose className="h-3 w-3" />
                 </button>
               )}
             </div>

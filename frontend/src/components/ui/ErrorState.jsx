@@ -1,5 +1,6 @@
 // frontend/src/components/ui/ErrorState.jsx
 import React from 'react';
+import { IconAlertTriangle, IconRefresh } from './Icons.jsx';
 
 /**
  * Enterprise SIEM ErrorState component.
@@ -21,16 +22,17 @@ export default function ErrorState({
         className={`flex items-center justify-between gap-3 rounded-lg border border-severity-high/40 bg-severity-high/10 px-4 py-2.5 text-xs text-severity-high ${className}`}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="shrink-0 text-sm">⚠️</span>
+          <IconAlertTriangle className="h-4 w-4 shrink-0 text-severity-high" />
           <span className="truncate font-medium">{message || title}</span>
         </div>
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className="shrink-0 font-mono font-semibold underline underline-offset-2 hover:text-white transition"
+            className="shrink-0 font-mono font-semibold underline underline-offset-2 hover:text-white transition flex items-center gap-1"
           >
-            Try again
+            <IconRefresh className="h-3 w-3" />
+            <span>Try again</span>
           </button>
         )}
       </div>
@@ -43,8 +45,8 @@ export default function ErrorState({
       aria-live="polite"
       className={`flex flex-col items-center justify-center p-8 text-center ${className}`}
     >
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-severity-high/30 bg-severity-high/10 text-xl text-severity-high">
-        ⚠️
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-severity-high/30 bg-severity-high/10 text-severity-high">
+        <IconAlertTriangle className="h-5 w-5" />
       </div>
       <h3 className="font-mono text-sm font-semibold tracking-wide text-ink-primary">
         {title}
@@ -60,7 +62,7 @@ export default function ErrorState({
           onClick={onRetry}
           className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-raised px-3.5 py-1.5 font-mono text-xs font-medium text-ink-primary transition hover:border-accent hover:text-accent"
         >
-          <span>↻</span>
+          <IconRefresh className="h-3.5 w-3.5" />
           <span>Try again</span>
         </button>
       )}

@@ -19,6 +19,7 @@ import PanelHeader from './ui/PanelHeader';
 import LoadingSkeleton from './ui/LoadingSkeleton';
 import EmptyState from './ui/EmptyState';
 import ErrorState from './ui/ErrorState';
+import { IconActivity, IconBarChart } from './ui/Icons.jsx';
 
 const SOURCE_COLORS = {
   windows: '#4FA8E0',
@@ -59,7 +60,7 @@ export default function EventTimeline({ timeRange = '24h', autoRefresh = true })
   return (
     <Panel className="flex h-full flex-col">
       <PanelHeader
-        icon="📈"
+        icon={<IconActivity className="h-5 w-5" />}
         title="Event Timeline"
         subtitle={`Events in the ${activeRange.fullLabel.toLowerCase()}`}
         right={
@@ -94,7 +95,7 @@ export default function EventTimeline({ timeRange = '24h', autoRefresh = true })
         {/* Clean Empty State */}
         {!isLoading && !isError && timeline.length === 0 && (
           <EmptyState
-            icon="📊"
+            icon={<IconBarChart className="h-6 w-6 text-ink-muted" />}
             title="No events in this time range"
             description={`No log activity has been recorded in the ${activeRange.fullLabel.toLowerCase()}. Telemetry from Filebeat and Winlogbeat will chart here.`}
             className="h-[320px]"

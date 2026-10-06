@@ -1,5 +1,6 @@
 // frontend/src/components/ui/EmptyState.jsx
 import React from 'react';
+import { IconShieldCheck } from './Icons.jsx';
 
 /**
  * Enterprise SIEM EmptyState component.
@@ -12,15 +13,15 @@ export default function EmptyState({
   action,
   className = '',
 }) {
+  const displayIcon = icon || <IconShieldCheck className="h-6 w-6 text-ink-muted" />;
+
   return (
     <div
       className={`flex flex-col items-center justify-center p-8 text-center ${className}`}
     >
-      {icon && (
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-hairline/60 bg-void/60 text-2xl text-ink-muted shadow-sm">
-          {icon}
-        </div>
-      )}
+      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-hairline/60 bg-void/60 text-ink-muted shadow-sm">
+        {displayIcon}
+      </div>
       <h3 className="font-mono text-sm font-semibold tracking-wide text-ink-primary">
         {title}
       </h3>
